@@ -21,18 +21,16 @@ object Main extends App {
   val vertices: RDD[(VertexId, Long)] = leadDf
     .select("from")
     .distinct
-    .rdd.map(row => row.getAs[Long]("from"))
+    .rdd.map(row => row.getAs[String]("from").toLong)
     .zipWithIndex // associate a long index to each vertex
     .map(_.swap)
 
-  val edges: RDD[Edge[(BigDecimal, BigDecimal)]] = leadDf
+  val edges: RDD[Edge[(BigDecimal,BigDecimal)]] = leadDf
     .select("from", "to", "from time", "to time")
     .rdd.map(
     row =>
-      row.getAs[Long]("from"),
-    row.getAs[String]("to"),
-    (row.getAs[BigDecimal]("from time"),
-      row.getAs[BigDecimal]("to time")))
+      Edge(row.getAs[String]("from").toLong, row.getAs[String]("to").toLong,
+        (row.getAs[BigDecimal]("from time"), row.getAs[BigDecimal]("to time"))))
 
   val graph = Graph(vertices, edges)
   println(graph.numEdges, graph.numVertices)
