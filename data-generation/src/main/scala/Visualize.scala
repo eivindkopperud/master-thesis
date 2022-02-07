@@ -1,28 +1,53 @@
-import org.apache.spark.graphx.Graph
+import org.apache.spark.graphx.{Edge, Graph, VertexId}
 
 import java.io.{BufferedWriter, File, FileWriter}
 
 object Visualize {
   // I think a way to visualize the graphs would be convenient now that we don't have Neo4j browser
-  def drawGraphViz[VD,ED](g:Graph[VD,ED]):Unit = {
-    //TODO https://visjs.github.io/vis-network/docs/network/
-    val x =
-      """
-      |<html>
-<script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
-        |<html>
-        |""".stripMargin
 
+  /** Converts a Graph to .gexf format and writes it to file
+   *
+   * @param g Graph to be visualized
+   * @param filename Filename to be written to
+   * @tparam VD Vertex type
+   * @tparam ED Edge type
+   */
+  def writeGraphToGephiFormat[VD, ED](g: Graph[VD, ED], filename: String = "myGraph.gexf"): Unit = {
+    val edgesToXml = (e: Edge[ED]) => "<edge source=\"" + e.srcId + "\" target=\"" + e.dstId + "\" label=\"" + e.attr + "\" />\n"
+    val vertexToXml = (v: (VertexId, VD)) => "<node id=\"" + v._1 + "\" label=\"" + v._2 + "\" />\n"
+
+    val str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+      "<gexf xmlns=\"http://www.gexf.net/1.2draft\" version=\"1.2\">\n" +
+      "  <graph mode=\"static\" defaultedgetype=\"directed\">\n" +
+      "    <nodes>\n" +
+      g.vertices.map(vertexToXml).collect.mkString +
+      "    </nodes>\n" +
+      "    <edges>\n" +
+      g.edges.map(edgesToXml).collect.mkString +
+      "    </edges>\n" +
+      "  </graph>\n" +
+      "</gexf>"
+    val pw = new java.io.PrintWriter(filename)
+    pw.write(str)
+    pw.close()
   }
-  def drawGraph[VD,ED](g:Graph[VD,ED]):Unit = {
+
+  /** Function for generating a d3.js representation of the graph. Does not work very well
+   *
+   * @param g A Graph
+   * @tparam VD Vertex type
+   * @tparam ED Edge type
+   */
+  def drawGraph[VD, ED](g: Graph[VD, ED]): Unit = {
 
     val u = java.util.UUID.randomUUID
     val v = g.vertices.collect.map(_._1)
     val file = new File("graph.html")
     val bw = new BufferedWriter(new FileWriter(file))
-    val x = ("""
+    val x = """
 <html>
-<div id='a""" + u + """' style='width:960px; height:500px'></div>
+<div id='a""" + u +
+      """' style='width:960px; height:500px'></div>
 <style>
   .node circle { fill: gray; }
   .node text { font: 10px sans-serif;
@@ -35,12 +60,15 @@ object Visualize {
 <script>
   var width = 960;
   height = 500;
-  var svg = d3.select("#a""" + u + """").append("svg").attr("width", width).attr("height", height);
-  var nodes = [""" + v.map("{id:" + _ + "}").mkString(",") + """];
+  var svg = d3.select("#a""" + u +
+      """").append("svg").attr("width", width).attr("height", height);
+  var nodes = [""" + v.map("{id:" + _ + "}").mkString(",") +
+      """];
   var links = [""" + g.edges.collect.map(
       e => "{source:nodes[" + v.indexWhere(_ == e.srcId) +
         "],target:nodes[" +
-        v.indexWhere(_ == e.dstId) + "]}").mkString(",") + """];
+        v.indexWhere(_ == e.dstId) + "]}").mkString(",") +
+      """];
   var link = svg.selectAll(".link").data(links);
   link.enter().insert("line", ".node").attr("class", "link");
   var node = svg.selectAll(".node").data(nodes);
@@ -58,8 +86,9 @@ object Visualize {
   }).nodes(nodes).links(links).start();
 </script>
 </html>
- """)
+ """
     bw.write(x)
     bw.close()
   }
+
 }
