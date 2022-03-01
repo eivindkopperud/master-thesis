@@ -8,10 +8,16 @@ object GeneratedGraph {
   type V = VertexRDD[String]
   type E = EdgeRDD[String]
 
-  def genGraph(sc: SparkContext): Graph[String, String] =
+  def genGridGraph[A,B](sc: SparkContext): Graph[(Int, Int), Double] =
+    GraphGenerators.gridGraph(sc, 5 , 5)
+
+  def genLogNormalGraph(sc: SparkContext): Graph[String, String] =
     GraphGenerators.logNormalGraph(sc, 5, 5)
       .mapVertices((id, num) => getRandomName)
       .mapEdges(edge => getRandomRelation)
+
+  def genRMATGraph(sc:SparkContext) : Graph[Int, Int] =
+    GraphGenerators.rmatGraph(sc, 5, 10)
 
   def getRandomName: String = new Faker().leagueOfLegends().champion()
 
