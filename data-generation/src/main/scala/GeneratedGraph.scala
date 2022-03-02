@@ -11,8 +11,8 @@ object GeneratedGraph {
   def genGridGraph[A,B](sc: SparkContext): Graph[(Int, Int), Double] =
     GraphGenerators.gridGraph(sc, 5 , 5)
 
-  def genLogNormalGraph(sc: SparkContext): Graph[String, String] =
-    GraphGenerators.logNormalGraph(sc, 5, 5)
+  def genLogNormalGraph(sc: SparkContext, nvert:Int=5, nedge:Int=5): Graph[String, String] =
+    GraphGenerators.logNormalGraph(sc, nvert, nedge)
       .mapVertices((id, num) => getRandomName)
       .mapEdges(edge => getRandomRelation)
 
