@@ -1,19 +1,16 @@
-import com.sun.tools.javac.code.TypeTag
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-
-import scala.reflect.runtime.universe.typeOf
 
 object CsvUtils {
   /*
   [String] -> [TemporalEvent]
   Map csv to case classes
    */
-  def textFileToRDDCaseClass(file: String, sc: SparkContext): RDD[TemporalEvent[BigDecimal]] = {
-    val rdd = sc.textFile(file).map(_.split(',')): RDD[Array[String]]
+  def textFileToRDDCaseClass(file: String, sc: SparkContext): RDD[TemporalEvent[BigDecimal]] =
+    sc.textFile(file)
+      .map(_.split(','))
+      .map(textToEvents)
 
-    rdd.map(textToEvents)
-  }
   val textToEvents: Array[String] => TemporalEvent[BigDecimal] = row => {
 
     TemporalEvent(
