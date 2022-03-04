@@ -4,6 +4,8 @@ import breeze.stats.distributions.LogNormal
 import org.apache.spark.SparkContext
 import org.apache.spark.graphx.{Graph, VertexId}
 
+import scala.reflect.ClassTag
+
 object UpdateDistributionMode extends Enumeration {
   type UpdateDistributionMode = Value
   val Uniform, HighDegreeSkew, LowDegreeSkew = Value
@@ -31,10 +33,12 @@ object UpdateDistributions {
    * @param mode         Mode for distributing the weights based on vertex degree
    * @param distribution Some probability distribution
    * @return */
-  def addVertexUpdateDistribution[VD, ED](sc: SparkContext, graph: Graph[VD, ED], mode: UpdateDistributionMode, distribution: LogNormal): Graph[Int, ED] = {
+  def addVertexUpdateDistribution[VD, ED: ClassTag](sc: SparkContext, graph: Graph[VD, ED], mode: UpdateDistributionMode, distribution: LogNormal): Graph[Int, ED] = {
     val graphWithDegree = graph
-      .outerJoinVertices(graph.degrees)((_, _, degree) => degree.get)
-      .vertices.collect()
+      .vertices
+      .zip(graph.ops.degrees)
+      .map(vertex => (vertex._1._1, vertex._2._2))
+      .collect()
       .sortBy(vertex => vertex)(withMode(mode))
 
     val updates = graph.mapVertices((_, _) => distribution.draw().toInt)
