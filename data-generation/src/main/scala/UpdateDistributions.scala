@@ -1,65 +1,111 @@
+import UpdateDistributionMode.UpdateDistributionMode
 import breeze.plot.{Figure, hist}
 import breeze.stats.distributions.LogNormal
-import org.apache.spark.graphx.Graph
+import org.apache.spark.SparkContext
+import org.apache.spark.graphx.{Graph, VertexId}
+
+object UpdateDistributionMode extends Enumeration {
+  type UpdateDistributionMode = Value
+  val Uniform, HighDegreeSkew, LowDegreeSkew = Value
+}
 
 object UpdateDistributions {
 
 
   /** Add log normal distributed weights as the property for vertices
    *
-   * @param g     Your graph
-   * @param mu    Expected value (Forventingsverdi)
-   * @param sigma Standard deviation(Eller varians?)
+   * @param graph A graph
+   * @param mu    Expected value
+   * @param sigma Standard deviation
    * @tparam VD VertexType
    * @tparam ED EdgeType
    * @return */
-  def add_log_normal_update_distr_vertex[VD, ED](g: Graph[VD, ED], mu: Int = 100, sigma: Double = 2): Graph[Int, ED] = {
-    g.mapVertices((_, _) => LogNormal(mu, sigma).draw().toInt)
+  def addLogNormalVertexUpdateDistribution[VD, ED](graph: Graph[VD, ED], mu: Int = 100, sigma: Double = 2): Graph[Int, ED] = {
+    graph.mapVertices((_, _) => LogNormal(mu, sigma).draw().toInt)
+  }
+
+  /** Add an update count to all nodes
+   *
+   * @param sc           A SparkContext
+   * @param graph        A graph
+   * @param mode         Mode for distributing the weights based on vertex degree
+   * @param distribution Some probability distribution
+   * @return */
+  def addVertexUpdateDistribution[VD, ED](sc: SparkContext, graph: Graph[VD, ED], mode: UpdateDistributionMode, distribution: LogNormal): Graph[Int, ED] = {
+    val graphWithDegree = graph
+      .outerJoinVertices(graph.degrees)((_, _, degree) => degree.get)
+      .vertices.collect()
+      .sortBy(vertex => vertex)(withMode(mode))
+
+    val updates = graph.mapVertices((_, _) => distribution.draw().toInt)
+      .vertices.collect()
+      .sortBy(_._2)
+      .map(_._2)
+
+    val rdd = sc.parallelize(
+      graphWithDegree
+        .zip(updates)
+        .map(vertex => (vertex._1._1, vertex._2))
+    )
+
+    Graph[Int, ED](rdd, graph.edges)
+  }
+
+  /** Get a vertex ordering rule based on a distribution mode
+   * @param mode  Indicates the mode of which the nodes are ordered by
+   * @return      A Ordering function
+   *  */
+  private def withMode(mode: UpdateDistributionMode): Ordering[(VertexId, Int)] = {
+    mode match {
+      case UpdateDistributionMode.Uniform => (x: (VertexId, Int), y: (VertexId, Int)) => x._1 compareTo y._1
+      case UpdateDistributionMode.LowDegreeSkew => (x: (VertexId, Int), y: (VertexId, Int) ) => x._2 compareTo y._2
+      case UpdateDistributionMode.HighDegreeSkew => (x: (VertexId, Int), y: (VertexId, Int) ) => y._2 compareTo x._2
+    }
   }
 
   /** Add log normal distributed weights as the property for vertices
    *
-   * @param g     Your graph
-   * @param mu    Expected value (Forventingsverdi)
-   * @param sigma Standard deviation(Eller varians?)
+   * @param graph A graph
+   * @param mu    Expected value
+   * @param sigma Standard deviation
    * @tparam VD VertexType
    * @tparam ED EdgeType
    * @return */
-  def add_log_normal_update_distr_edge[VD, ED](g: Graph[VD, ED], mu: Int = 100, sigma: Double = 2): Graph[VD, Int] = {
-    g.mapEdges(_ => LogNormal(mu, sigma).draw().toInt)
+  def addLogNormalEdgeUpdateDistribution[VD, ED](graph: Graph[VD, ED], mu: Int = 100, sigma: Double = 2): Graph[VD, Int] = {
+    graph.mapEdges(_ => LogNormal(mu, sigma).draw().toInt)
   }
 
   /** Add log normal distributed weights as the property for vertices and edges
    *
    * Idk why this isn't just one function. TODO make a general function where the distribution can be inserted
-   * @param mu Expected value
-   * @param sigma Standard deviation (or variance?)
+   *
+   * @param mu    Expected value
+   * @param sigma Standard deviation
    */
-  def add_log_normal_update_distr_graph[VD, ED](g: Graph[VD, ED], mu: Int = 100, sigma: Double = 2): Graph[Int, Int] = {
-    val g1 = add_log_normal_update_distr_vertex(g, mu, sigma)
-    add_log_normal_update_distr_edge(g1, mu, sigma)
+  def addLogNormalGraphUpdateDistribution[VD, ED](g: Graph[VD, ED], mu: Int = 100, sigma: Double = 2): Graph[Int, Int] = {
+    val g1 = addLogNormalVertexUpdateDistribution(g, mu, sigma)
+    addLogNormalEdgeUpdateDistribution(g1, mu, sigma)
   }
-
 
 
   /** Plot the distribution of the Int associated with vertices
    *
-   * @param g        Your graph
+   * @param graph    A graph
    * @param bins     Number of bins for the histogram
    * @param title    Title for the generated diagram
    * @param filename Filename for the diagram
    * @tparam ED Edges can have any type */
-  def plotUpdateDistributionVertices[ED](g: Graph[Int, ED], bins: Int = 100, title: String = "Here your dist", filename: String = "plot.png"): Unit = {
-    val f = Figure()
-    val p = f.subplot(0)
-    p += hist(g.vertices.values.collect(), bins)
-    p.title = title
-    f.saveas(filename)
+  def plotUpdateDistributionVertices[ED](graph: Graph[Int, ED], bins: Int = 100, title: String = "Here your dist", filename: String = "plot.png"): Unit = {
+    val figure = Figure()
+    val plot = figure.subplot(0)
+    plot += hist(graph.vertices.values.collect(), bins)
+    plot.title = title
+    figure.saveas(filename)
   }
 
   /** Plot the distribution of the Int associated with edges
    *
-   * @param g        Your graph
+   * @param graph    A graph
    * @param bins     Number of bins for the histogram
    * @param title    Title for the generated diagram
    * @param filename Filename for the diagram
