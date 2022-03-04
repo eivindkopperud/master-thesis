@@ -1,6 +1,7 @@
+import DistributionType.DistributionType
 import UpdateDistributionMode.UpdateDistributionMode
 import breeze.plot.{Figure, hist}
-import breeze.stats.distributions.LogNormal
+import breeze.stats.distributions.{Gaussian, LogNormal}
 import org.apache.spark.SparkContext
 import org.apache.spark.graphx.{Graph, VertexId}
 
@@ -11,8 +12,12 @@ object UpdateDistributionMode extends Enumeration {
   val Uniform, HighDegreeSkew, LowDegreeSkew = Value
 }
 
-object UpdateDistributions {
+object DistributionType extends Enumeration {
+  type DistributionType = Value
+  val LogNormal, Gaussian = Value
+}
 
+object UpdateDistributions {
 
   /** Add log normal distributed weights as the property for vertices
    *
@@ -32,8 +37,10 @@ object UpdateDistributions {
    * @param graph        A graph
    * @param mode         Mode for distributing the weights based on vertex degree
    * @param distribution Some probability distribution
+   * @param mu           Expected value
+   * @param sigma        Standard deviation
    * @return */
-  def addVertexUpdateDistribution[VD, ED: ClassTag](sc: SparkContext, graph: Graph[VD, ED], mode: UpdateDistributionMode, distribution: LogNormal): Graph[Int, ED] = {
+  def addVertexUpdateDistribution[VD, ED: ClassTag](sc: SparkContext, graph: Graph[VD, ED], mode: UpdateDistributionMode, distribution: DistributionType, mu: Int, sigma: Double): Graph[Int, ED] = {
     val graphWithDegree = graph
       .vertices
       .zip(graph.ops.degrees)
@@ -41,7 +48,7 @@ object UpdateDistributions {
       .collect()
       .sortBy(vertex => vertex)(withMode(mode))
 
-    val updates = graph.mapVertices((_, _) => distribution.draw().toInt)
+    val updates = graph.mapVertices((_, _) => getDistributionDraw(distribution, mu, sigma))
       .vertices.collect()
       .sortBy(_._2)
       .map(_._2)
@@ -56,14 +63,29 @@ object UpdateDistributions {
   }
 
   /** Get a vertex ordering rule based on a distribution mode
-   * @param mode  Indicates the mode of which the nodes are ordered by
-   * @return      A Ordering function
-   *  */
+   *
+   * @param mode Indicates the mode of which the nodes are ordered by
+   * @return A Ordering function
+   * */
   private def withMode(mode: UpdateDistributionMode): Ordering[(VertexId, Int)] = {
     mode match {
       case UpdateDistributionMode.Uniform => (x: (VertexId, Int), y: (VertexId, Int)) => x._1 compareTo y._1
-      case UpdateDistributionMode.LowDegreeSkew => (x: (VertexId, Int), y: (VertexId, Int) ) => x._2 compareTo y._2
-      case UpdateDistributionMode.HighDegreeSkew => (x: (VertexId, Int), y: (VertexId, Int) ) => y._2 compareTo x._2
+      case UpdateDistributionMode.LowDegreeSkew => (x: (VertexId, Int), y: (VertexId, Int)) => x._2 compareTo y._2
+      case UpdateDistributionMode.HighDegreeSkew => (x: (VertexId, Int), y: (VertexId, Int)) => y._2 compareTo x._2
+    }
+  }
+
+  /** Draw a number from a probability distribution
+   * @param distribution The type of probability distribution
+   * @param mu  Expected value
+   * @param sigma Standard deviation
+   * @return             A value in the distribution
+   * TODO: Make the input parameter agnostic - not only mu an sigma
+   * */
+  private def getDistributionDraw(distribution: DistributionType, mu: Int, sigma: Double): Int = {
+    distribution match {
+      case DistributionType.LogNormal => LogNormal(mu, sigma).draw().toInt
+      case DistributionType.Gaussian => Gaussian(mu, sigma).draw().toInt
     }
   }
 
