@@ -139,7 +139,6 @@ object UpdateDistributions {
    * TODO make a general function where the distribution can be inserted
    *
    * @param sc    A SparkContext
-   * @param graph A graph
    * @param mu    Expected value
    * @param sigma Standard deviation
    */
@@ -155,7 +154,7 @@ object UpdateDistributions {
    * @param title    Title for the generated diagram
    * @param filename Filename for the diagram
    * @tparam ED Edges can have any type */
-  def plotUpdateDistributionVertices[ED](graph: Graph[Int, ED], bins: Int = 100, title: String = "Here your dist", filename: String = "plot.png"): Unit = {
+  def plotUpdateDistributionVerticessss[ED](graph: Graph[Int, ED], bins: Int = 100, title: String = "Here your dist", filename: String = "plot.png"): Unit = {
     val figure = Figure()
     val plot = figure.subplot(0)
     plot += hist(graph.vertices.values.collect(), bins)
