@@ -1,5 +1,4 @@
-import DistributionType.DistributionType
-import UpdateDistributionMode.UpdateDistributionMode
+import DistributionType.LogNormalType
 import breeze.plot.{Figure, hist}
 import breeze.stats.distributions.{Gaussian, LogNormal}
 import org.apache.spark.SparkContext
@@ -7,14 +6,19 @@ import org.apache.spark.graphx.{Edge, Graph, VertexId}
 
 import scala.reflect.ClassTag
 
-object UpdateDistributionMode extends Enumeration {
-  type UpdateDistributionMode = Value
-  val Uniform, PositiveCorrelation, NegativeCorrelation = Value
+sealed abstract class CorrelationMode
+
+object CorrelationMode {
+  final case object Uniform extends CorrelationMode
+  final case object PositiveCorrelation extends CorrelationMode
+  final case object NegativeCorrelation extends CorrelationMode
 }
 
-object DistributionType extends Enumeration {
-  type DistributionType = Value
-  val LogNormal, Gaussian = Value
+sealed abstract class DistributionType
+
+object DistributionType {
+  final case class LogNormalType(mu: Int, sigma: Double) extends DistributionType
+  final case class GaussianType(mu: Int, sigma: Double) extends DistributionType
 }
 
 object UpdateDistributions {
@@ -28,7 +32,7 @@ object UpdateDistributions {
    * @param mu           Expected value
    * @param sigma        Standard deviation
    * @return */
-  def addVertexUpdateDistribution[VD, ED: ClassTag](sc: SparkContext, graph: Graph[VD, ED], mode: UpdateDistributionMode, distribution: DistributionType, mu: Int, sigma: Double): Graph[Int, ED] = {
+  def addVertexUpdateDistribution[VD, ED: ClassTag](sc: SparkContext, graph: Graph[VD, ED], mode: CorrelationMode, distribution: DistributionType): Graph[Int, ED] = {
     val graphWithDegree = graph
       .vertices
       .zip(graph.ops.degrees)
@@ -36,8 +40,9 @@ object UpdateDistributions {
       .collect()
       .sortBy(vertexTuple => vertexTuple)(getVertexSorting(mode))
 
-    val updates = graph.mapVertices((_, _) => getDistributionDraw(distribution, mu, sigma))
-      .vertices.collect()
+    val updates = graph.mapVertices((_, _) => getDistributionDraw(distribution))
+      .vertices
+      .collect()
       .sortBy(_._2)
       .map(_._2)
 
@@ -55,11 +60,11 @@ object UpdateDistributions {
    * @param mode Indicates the mode of which the nodes are ordered by
    * @return A Ordering function
    * */
-  private def getVertexSorting(mode: UpdateDistributionMode): Ordering[(VertexId, Int)] = {
+  private def getVertexSorting(mode: CorrelationMode): Ordering[(VertexId, Int)] = {
     mode match {
-      case UpdateDistributionMode.Uniform => (x: (VertexId, Int), y: (VertexId, Int)) => x._1 compareTo y._1
-      case UpdateDistributionMode.PositiveCorrelation => (x: (VertexId, Int), y: (VertexId, Int)) => x._2 compareTo y._2
-      case UpdateDistributionMode.NegativeCorrelation => (x: (VertexId, Int), y: (VertexId, Int)) => y._2 compareTo x._2
+      case CorrelationMode.Uniform => (x: (VertexId, Int), y: (VertexId, Int)) => x._1 compareTo y._1
+      case CorrelationMode.PositiveCorrelation => (x: (VertexId, Int), y: (VertexId, Int)) => x._2 compareTo y._2
+      case CorrelationMode.NegativeCorrelation => (x: (VertexId, Int), y: (VertexId, Int)) => y._2 compareTo x._2
     }
   }
 
@@ -72,7 +77,7 @@ object UpdateDistributions {
    * @param mu           Expected value
    * @param sigma        Standard deviation
    * @return */
-  def addEdgeUpdateDistribution[VD, ED: ClassTag](sc: SparkContext, graph: Graph[Int, ED], mode: UpdateDistributionMode, distribution: DistributionType, mu: Int, sigma: Double): Graph[Int, Int] = {
+  def addEdgeUpdateDistribution[VD, ED: ClassTag](sc: SparkContext, graph: Graph[Int, ED], mode: CorrelationMode, distribution: DistributionType): Graph[Int, Int] = {
     val vertexUpdateHashMap = graph
       .vertices
       .collect()
@@ -85,7 +90,7 @@ object UpdateDistributions {
       .sortBy(edge => edge)(getEdgeSorting(mode))
 
     val updates = graph
-      .mapEdges(_ => getDistributionDraw(distribution, mu, sigma))
+      .mapEdges(_ => getDistributionDraw(distribution))
       .edges
       .collect()
       .sortBy(edge => edge.attr)
@@ -109,26 +114,23 @@ object UpdateDistributions {
     hashMap.getOrElse(edge.srcId, 0) + hashMap.getOrElse(edge.dstId, 0)
   }
 
-  private def getEdgeSorting(mode: UpdateDistributionMode): Ordering[Edge[Int]] = {
+  private def getEdgeSorting(mode: CorrelationMode): Ordering[Edge[Int]] = {
     mode match {
-      case UpdateDistributionMode.Uniform => (x: Edge[_], y: Edge[_]) => x.hashCode() compareTo y.hashCode()
-      case UpdateDistributionMode.PositiveCorrelation => (x: Edge[Int], y: Edge[Int]) => x.attr compareTo y.attr
-      case UpdateDistributionMode.NegativeCorrelation => (x: Edge[Int], y: Edge[Int]) => y.attr compareTo x.attr
+      case CorrelationMode.Uniform => (x: Edge[_], y: Edge[_]) => x.hashCode() compareTo y.hashCode()
+      case CorrelationMode.PositiveCorrelation => (x: Edge[Int], y: Edge[Int]) => x.attr compareTo y.attr
+      case CorrelationMode.NegativeCorrelation => (x: Edge[Int], y: Edge[Int]) => y.attr compareTo x.attr
     }
   }
 
   /** Draw a number from a probability distribution
    *
    * @param distribution The type of probability distribution
-   * @param mu           Expected value
-   * @param sigma        Standard deviation
    * @return A value in the distribution
-   *         TODO: Make the input parameter agnostic - not only mu and sigma
    * */
-  private def getDistributionDraw(distribution: DistributionType, mu: Int, sigma: Double): Int = {
+  private def getDistributionDraw(distribution: DistributionType): Int = {
     distribution match {
-      case DistributionType.LogNormal => LogNormal(mu, sigma).draw().toInt
-      case DistributionType.Gaussian => Gaussian(mu, sigma).draw().toInt
+      case DistributionType.LogNormalType(mu, sigma) => LogNormal(mu, sigma).draw().toInt
+      case DistributionType.GaussianType(mu, sigma) => Gaussian(mu, sigma).draw().toInt
     }
   }
 
@@ -143,8 +145,8 @@ object UpdateDistributions {
    * @param sigma Standard deviation
    */
   def addLogNormalGraphUpdateDistribution[VD, ED: ClassTag](sc: SparkContext, graph: Graph[VD, ED], mu: Int = 100, sigma: Double = 2): Graph[Int, Int] = {
-    val g1 = addVertexUpdateDistribution(sc, graph, UpdateDistributionMode.PositiveCorrelation, DistributionType.LogNormal, mu, sigma)
-    addEdgeUpdateDistribution(sc, g1, UpdateDistributionMode.PositiveCorrelation, DistributionType.LogNormal, mu, sigma)
+    val g1 = addVertexUpdateDistribution(sc, graph, CorrelationMode.PositiveCorrelation, LogNormalType(mu, sigma))
+    addEdgeUpdateDistribution(sc, g1, CorrelationMode.PositiveCorrelation, LogNormalType(mu, sigma))
   }
 
   /** Plot the distribution of the Int associated with vertices
@@ -154,7 +156,7 @@ object UpdateDistributions {
    * @param title    Title for the generated diagram
    * @param filename Filename for the diagram
    * @tparam ED Edges can have any type */
-  def plotUpdateDistributionVerticessss[ED](graph: Graph[Int, ED], bins: Int = 100, title: String = "Here your dist", filename: String = "plot.png"): Unit = {
+  def plotUpdateDistributionVertices[ED](graph: Graph[Int, ED], bins: Int = 100, title: String = "Here your dist", filename: String = "plot.png"): Unit = {
     val figure = Figure()
     val plot = figure.subplot(0)
     plot += hist(graph.vertices.values.collect(), bins)
