@@ -32,7 +32,7 @@ object UpdateDistributions {
     val graphWithDegree = graph
       .vertices
       .zip(graph.ops.degrees)
-      .map(vertex => (vertex._1._1, vertex._2._2))
+      .map((_._1._1, _._2._2))
       .collect()
       .sortBy(vertexTuple => vertexTuple)(getVertexSorting(mode))
 

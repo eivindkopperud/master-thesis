@@ -21,7 +21,6 @@ object TopologyGraphGenerator {
       .withColumn("edgeId", last(col("id"), ignoreNulls = true).over(window.rowsBetween(Window.unboundedPreceding, 0)))
     val tempDf = df.groupBy("edgeId").agg(functions.min("time").alias("from time"), functions.max("time").alias("to time"))
     val leadDf = df.as("self1").join(tempDf.as("self2"), col("self1.id") === col("self2.edgeId"), "inner").select("from", "to", "from time", "to time")
-    leadDf.show()
     val vertices: RDD[(Long, Long)] = leadDf
       .select("from")
       .distinct
