@@ -36,7 +36,7 @@ object UpdateDistributions {
     val graphWithDegree = graph
       .vertices
       .zip(graph.ops.degrees)
-      .map((_._1._1, _._2._2))
+      .map(vertex => (vertex._1._1, vertex._2._2))
       .collect()
       .sortBy(vertexTuple => vertexTuple)(getVertexSorting(mode))
 
@@ -62,7 +62,7 @@ object UpdateDistributions {
    * */
   private def getVertexSorting(mode: CorrelationMode): Ordering[(VertexId, Int)] = {
     mode match {
-      case CorrelationMode.Uniform => (x: (VertexId, Int), y: (VertexId, Int)) => x._1 compareTo y._1
+      case CorrelationMode.Uniform => (x: (VertexId, Int), y: (VertexId, Int)) => x.hashCode() compareTo y.hashCode()
       case CorrelationMode.PositiveCorrelation => (x: (VertexId, Int), y: (VertexId, Int)) => x._2 compareTo y._2
       case CorrelationMode.NegativeCorrelation => (x: (VertexId, Int), y: (VertexId, Int)) => y._2 compareTo x._2
     }
@@ -74,8 +74,6 @@ object UpdateDistributions {
    * @param graph        A graph where vertices have a update count as a Int
    * @param mode         Mode for distributing the weights based on vertex degree
    * @param distribution Some probability distribution
-   * @param mu           Expected value
-   * @param sigma        Standard deviation
    * @return */
   def addEdgeUpdateDistribution[VD, ED: ClassTag](sc: SparkContext, graph: Graph[Int, ED], mode: CorrelationMode, distribution: DistributionType): Graph[Int, Int] = {
     val vertexUpdateHashMap = graph
