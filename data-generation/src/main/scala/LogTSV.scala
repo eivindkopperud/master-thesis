@@ -1,8 +1,10 @@
 import Action.{CREATE, DELETE, UPDATE}
+import Entity.{EDGE, VERTEX}
 import LTSV.Attributes
 import com.github.javafaker.Faker
 
 import java.time.{Instant, LocalDateTime, ZoneOffset}
+import scala.collection.immutable.HashMap
 import scala.util.Try
 import scala.util.Random.nextInt
 import scala.io.Source
@@ -16,7 +18,14 @@ object Action{
   final case object UPDATE extends Action
   final case object DELETE extends Action
 }
+sealed abstract class Entity
+object Entity {
+  final case class VERTEX(objId:Long) extends Entity
+  final case class EDGE(srcId:Long, dstId:Long) extends Entity
+}
 
+// TODO create EdgeLogTSV and VertexLogTSV
+// toEdgeLog(l:LogTSV): Option[EdgeLogTSV]
 /** LogTSV
  *
  * Everything is built around this case class
@@ -26,9 +35,10 @@ object Action{
  * @param attributes List of (Key,Value) attributes relevant to the entry
  */
 case class LogTSV(
+                 sequentialId: Int,
                  timestamp : Instant,
                  action : Action,
-                 objectId: Long,
+                 objectType: Entity,
                  attributes: Attributes
                  )
 
@@ -45,7 +55,7 @@ object LTSV {
     LogTSV(
       timestamp = Instant.now(),
       action = actions(nextInt(actions.size)),
-      objectId = nextInt(10000),
+      objectType = VERTEX(nextInt(10000)),
       attributes = List(("champion",faker.leagueOfLegends().champion()),
         ("friends", faker.friends().character()))
     )
@@ -54,7 +64,7 @@ object LTSV {
 
   }
   // Type alias
-  type Attributes = List[(String, String)]
+  type Attributes = HashMap[String, String]
 
   /** Serialize a single LogTSV
    *
@@ -68,10 +78,16 @@ object LTSV {
       case UPDATE => "UPDATE"
       case DELETE => "DELETE"
     }
-    val objectId = logEntry.objectId.toString
-    val attributes = serializeAttributes(logEntry.attributes)
+    val objectType = logEntry.objectType match {
+      case Entity.VERTEX(id) => "EDGE"
+      case Entity.EDGE(srcId, dstId) => "VERTEX"
+    }
+    val attributes = logEntry.objectType match {
+      case VERTEX(objId) => serializeAttributes(("objId",objId.toString)::logEntry.attributes)
+      case EDGE(srcId, dstId) => serializeAttributes(("srcId",srcId.toString)::("dstId",dstId.toString)::logEntry.attributes)
+    }
 
-    List(timestamp, action, objectId, attributes)
+    List(timestamp, action, objectType, attributes)
       .mkString("\t")
   }
 
@@ -94,7 +110,7 @@ object LTSV {
   def deserializeLTSV(logEntry:String):Option[LogTSV] = {
     // This line could fail, but its a hassle to make safe
     // Destructures the first three items, and 'attributes' is the tail
-    val timestamp::action::objectId::attributes : List[String]= logEntry.split('\t').toList
+    val timestamp::action::objectId::objectType::attributes : List[String]= logEntry.split('\t').toList
     for {
       deserializedTimestamp <- Try {Instant.parse(timestamp)}.toOption
       deserializedAction <- action match {
@@ -104,8 +120,13 @@ object LTSV {
         case _ => None
       }
       deserializedObjectId <- Try{objectId.toLong}.toOption
+      deserializedObjectType <- objectType match {
+        case "VERTEX" => Some(VERTEX)
+        case "EDGE" => Some(EDGE)
+        case _ => None
+      }
       deserializedAttributes <- deserializeAttributes(attributes)
-    } yield LogTSV(deserializedTimestamp, deserializedAction, deserializedObjectId, deserializedAttributes)
+    } yield LogTSV(deserializedTimestamp, deserializedAction, deserializedObjectId,deserializedObjectType, deserializedAttributes)
   }
 
 
