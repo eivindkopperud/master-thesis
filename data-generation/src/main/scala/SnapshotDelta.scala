@@ -1,7 +1,6 @@
-import Action.{DELETE, UPDATE}
+import Action.{CREATE, DELETE, UPDATE}
 import Entity.{EDGE, VERTEX}
-import LTSV.Attributes
-import org.apache.commons.lang.mutable.Mutable
+import LTSV.{Attributes, deserializeLTSV}
 import org.apache.spark.graphx._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
@@ -76,54 +75,58 @@ object SnapshotDelta {
     }
   }
 
-  def snapShotCount(logs:RDD[LogTSV], numberOfActions:Int): SnapshotDelta[Attributes,Attributes] ={
-    val initalGraph = createGraph(logs.map(x => (x.sequentialId,x)).filterByRange(0,numberOfActions).map(_._2))
-    var graphs = mutable.MutableList(initalGraph)
-      for ( i <- 1 to (logs.count()/numberOfActions).ceil.toInt) {
+  def snapShotCount(logs: RDD[LogTSV], numberOfActions: Int): SnapshotDelta[Attributes,Attributes] = {
+    val initialGraph = createGraph(logs.map(log => (log.sequentialId, log)).filterByRange(0, numberOfActions).map(_._2))
+    val graphs = mutable.MutableList(initialGraph)
+      for ( i <- 1 to (logs.count() / numberOfActions).ceil.toInt) {
         // Get subset of logs
-        val previousSnapshot = graphs(i-1)
-        val LTSVInterval = logs
-          .map(x => (x.sequentialId, x))                                  // Mapping like this makes it into a KeyValuePairRDD, which have some convenient methods
+        val previousSnapshot = graphs(i - 1)
+        val logInterval = logs
+          .map(log => (log.sequentialId, log))                                  // Mapping like this makes it into a KeyValuePairRDD, which have some convenient methods
           .filterByRange(numberOfActions * i, numberOfActions * (i + 1)) // This lets ut get a slice of the LTSVs
           .map(_._2) // This maps the type into back to its original form
 
-        // Lets get all the relevant LTSV for each Edge (Edge,RDD[LTSV])
-        val edges =
-          previousSnapshot.edges
-            .map(e => (e, LTSVInterval.filter(z => z.objectType match {
-              case VERTEX(objId) => (objId == e.dstId || objId == e.srcId) && z.action == DELETE // DELETE vertex operations is relevant for edges since it will delete them as well
-              case EDGE(srcId, dstId) => srcId == e.srcId && dstId == e.dstId
-            }
-            )))
+        // Get all ids of vertices in the log interval
+        val vertexIds = logInterval.map( log => {
+          log.objectType match {
+            case VERTEX(objId) => Some(objId)
+            case EDGE(_, _) => None
+          }
+        }).filter(_.isDefined).map(_.get)
 
-        // Lets get all the relevant LTSV for each Edge (Vertex,RDD[LTSV])
-        // This can be possibly rewritten into groupByKey
-        //}
-        val vertices = previousSnapshot.vertices.map(v => (v, LTSVInterval.filter(z => z.objectType match {
-          case VERTEX(objId) => v._1 == objId
+        // Squash all actions on each vertex to one single action
+        val verticesWithAction = vertexIds.map(id => (id, logInterval.filter( log => log.objectType match {
+          case VERTEX(objId) => id == objId
           case EDGE(_, _) => false
         })))
+          .map(vertexWithActions => (vertexWithActions._1, mergeLogTSVs(vertexWithActions._2)))
 
-        //MISSING CREATE UPDATE DELETE FOR NEW VERTICES AND EDGES
-
-        val processed_edges = edges.map( x => {
-          val (edge, logs) = x
-          val bigLTSV = logs.reduce(mergeLogTSV)
-          bigLTSV.action match {
-            case UPDATE => Some(Edge(edge.srcId, edge.dstId, rightWayMergeHashMap(edge.attr, bigLTSV.attributes)))
-            case DELETE => None
+        // Get all ids of edges in the log interval
+        val edgeIds = logInterval.map( log => {
+          log.objectType match {
+            case VERTEX(_) => None
+            case EDGE(srcId, dstId) => Some(srcId, dstId)
           }
         }).filter(_.isDefined).map(_.get)
 
-        val processed_vertices = vertices.map(x => {
-          val ((id, attr),logs) = x
-          val newLTSV = mergeLogTSVs(logs)
-          newLTSV.action match {
-            case UPDATE => Some((id, rightWayMergeHashMap(attr, newLTSV.attributes)))
-            case DELETE => None
-          }
-        }).filter(_.isDefined).map(_.get)
-        graphs += Graph(processed_vertices, processed_edges)
+        // Squash all actions on each edge to one single action
+        val edgesWithAction = edgeIds.map( id => (id, logInterval.filter( log => log.objectType match {
+          case VERTEX(objId) => id == objId
+          case EDGE(srcId, dstId) => id == srcId || id == dstId
+        })))
+          .map(edgeWithAction => (edgeWithAction._1, mergeLogTSVs(edgeWithAction._2)))
+          .map(edge => Edge(edge._1._1, edge._1._2, edge._2))
+
+        // We now need to get on the format
+        // (previousSnapshotEdge, newSnapshotAction)
+        // such that we map the previous state to the new state by merging attributes
+        // (this does also hold for vertices)
+
+        // We also need to add new edges to the edgeRDD when CREATE appears
+
+        // val updatedVertices = ..old vertices with new merged action applied..
+        // val updatedEdges = ..old edges with new merged action applied..
+        graphs += Graph(updatedVertices, updatedEdges)
       })
 
         Graph(vertices, edges)
@@ -134,7 +137,9 @@ object SnapshotDelta {
  def mergeLogTSV(l1: LogTSV, l2: LogTSV) : LogTSV= {
    (l1.action, l2.action) match {
      case (UPDATE, DELETE) => l2
+     case (CREATE, DELETE) => l2
      case (UPDATE, UPDATE) => l2.copy(attributes=rightWayMergeHashMap(l1.attributes, l2.attributes))
+     case (CREATE, UPDATE) => l1.copy(attributes=rightWayMergeHashMap(l2.attributes, l1.attributes))
      case (_,_) => assert(1==2); l1;
 
    }
@@ -144,34 +149,10 @@ def rightWayMergeHashMap(attributes: LTSV.Attributes, attributes1: LTSV.Attribut
     attributes.merged(attributes1)((_,y) => y)
   }
 
-// This is wrong
   def createGraph(logs:RDD[LogTSV]):Graph[Attributes,Attributes] = {
-    val vertexIds = logs.map( ltsv => {
-      ltsv.objectType match {
-        case VERTEX(objId) => Some(objId)
-        case EDGE(srcId, dstId) => None
-      }
-    }).filter(_.isDefined).map(_.get)
-
-    //should be identical
-    val vertexPlusTSVs = vertexIds.map( id => (id, logs.filter( ltsv => ltsv.objectType match {
-      case VERTEX(objId) => id == objId
-      case EDGE(_, _) => false
-    })))
-
-    //should be identical
-    val vertexIds2 = logs.map(ltsv => ltsv.objectType match {
-      case VERTEX(objId) => (Some(objId, ltsv))
-      case EDGE(srcId, dstId) => None
-    }).filter(_.isDefined).map(_.get).groupByKey()
-
-    val edgePlusTSVs = logs.map(ltsv => ltsv.objectType match {
-      case VERTEX(objId) => None
-      case EDGE(srcId, dstId) => (Some((srcId, dstId), ltsv))
-    }).filter(_.isDefined).map(_.get).groupByKey()
-
-    // In the end handle get all deletes and delete stuff
-
+    // Might need to be re-implemented
+    // vertices = ...
+    // edges = ...
 
     Graph(vertices, edges)
   }
