@@ -87,12 +87,7 @@ object SnapshotDelta {
           .map(_._2)                                                     // This maps the type into back to its original form
 
         // Get all ids of vertices in the log interval
-        val vertexIds = logInterval.flatMap( log => {
-          log.objectType match {
-            case VERTEX(objId) => Some(objId)
-            case EDGE(_, _) => None
-          }
-        })
+        val vertexIds = logInterval.flatMap(getVertexIds)
 
         // Squash all actions on each vertex to one single action
         val verticesWithAction = vertexIds.map(id => (id, logInterval.filter( log => log.objectType match {
@@ -102,12 +97,7 @@ object SnapshotDelta {
           .map(vertexWithActions => (vertexWithActions._1, mergeLogTSVs(vertexWithActions._2)))
 
         // Get all ids of edges in the log interval
-        val edgeIds = logInterval.flatMap( log => {
-          log.objectType match {
-            case VERTEX(_) => None
-            case EDGE(srcId, dstId) => Some(srcId, dstId)
-          }
-        })
+        val edgeIds = logInterval.flatMap(getEdgeIds)
 
         // Squash all actions on each edge to one single action
         val edgesWithAction = edgeIds.map( id => (id, logInterval.filter( log => log.objectType match {
@@ -159,6 +149,27 @@ def rightWayMergeHashMap(attributes: LTSV.Attributes, attributes1: LTSV.Attribut
     attributes.merged(attributes1)((_,y) => y)
   }
 
+// Could maybe be RDD[LogTSV] -> RDD[Long] instead
+// But I do like seeing the transformations/actions where it's used
+// so the Spark abstraction is not lost
+// For example this function is just a transformation
+// From the caller it could look like an action if it was used like
+// edgeIds = getEdgeIds(logs)
+// (The types would of course prove the assumption wrong, but it's nice
+// either way
+def getEdgeIds(log:LogTSV):Option[(Long,Long)] = {
+  log.objectType match {
+    case VERTEX(objId) => None
+    case EDGE(srcId, dstId) => Some(srcId,dstId)
+  }
+}
+def getVertexIds(log:LogTSV):Option[Long] = {
+  log.objectType match {
+    case VERTEX(objId) => Some(objId)
+    case EDGE(_, _) => None
+  }
+}
+
 /** Create graph from an initial list of LogTSVs
  *
  * @param logs Initial log entries
@@ -168,7 +179,10 @@ def rightWayMergeHashMap(attributes: LTSV.Attributes, attributes1: LTSV.Attribut
     // Might need to be re-implemented
     // vertices = ...
     // edges = ...
+    val vertexIds = logs.flatMap(getEdgeIds)
 
-    Graph(vertices, edges)
+    val edgeIds = logs.flatMap(getEdgeIds)
+
+      Graph(vertices, edges)
   }
 }
