@@ -82,17 +82,17 @@ object SnapshotDelta {
         // Get subset of logs
         val previousSnapshot = graphs(i - 1)
         val logInterval = logs
-          .map(log => (log.sequentialId, log))                                  // Mapping like this makes it into a KeyValuePairRDD, which have some convenient methods
+          .map(log => (log.sequentialId, log))                           // Mapping like this makes it into a KeyValuePairRDD, which have some convenient methods
           .filterByRange(numberOfActions * i, numberOfActions * (i + 1)) // This lets ut get a slice of the LTSVs
-          .map(_._2) // This maps the type into back to its original form
+          .map(_._2)                                                     // This maps the type into back to its original form
 
         // Get all ids of vertices in the log interval
-        val vertexIds = logInterval.map( log => {
+        val vertexIds = logInterval.flatMap( log => {
           log.objectType match {
             case VERTEX(objId) => Some(objId)
             case EDGE(_, _) => None
           }
-        }).filter(_.isDefined).map(_.get)
+        })
 
         // Squash all actions on each vertex to one single action
         val verticesWithAction = vertexIds.map(id => (id, logInterval.filter( log => log.objectType match {
@@ -102,17 +102,17 @@ object SnapshotDelta {
           .map(vertexWithActions => (vertexWithActions._1, mergeLogTSVs(vertexWithActions._2)))
 
         // Get all ids of edges in the log interval
-        val edgeIds = logInterval.map( log => {
+        val edgeIds = logInterval.flatMap( log => {
           log.objectType match {
             case VERTEX(_) => None
             case EDGE(srcId, dstId) => Some(srcId, dstId)
           }
-        }).filter(_.isDefined).map(_.get)
+        })
 
         // Squash all actions on each edge to one single action
         val edgesWithAction = edgeIds.map( id => (id, logInterval.filter( log => log.objectType match {
-          case VERTEX(objId) => id == objId
-          case EDGE(srcId, dstId) => id == srcId || id == dstId
+          case VERTEX(_) => false // Didn't we talk about handling deletes in the end? Else this should be: id_1 ==objId || id._2 == objId
+          case EDGE(srcId, dstId) => id._1 == srcId && id._2 == dstId
         })))
           .map(edgeWithAction => (edgeWithAction._1, mergeLogTSVs(edgeWithAction._2)))
           .map(edge => Edge(edge._1._1, edge._1._2, edge._2))
@@ -123,6 +123,7 @@ object SnapshotDelta {
         // (this does also hold for vertices)
 
         // We also need to add new edges to the edgeRDD when CREATE appears
+        // DELETES are not handled in edgesWithAction
 
         // val updatedVertices = ..old vertices with new merged action applied..
         // val updatedEdges = ..old edges with new merged action applied..
@@ -136,19 +137,33 @@ object SnapshotDelta {
 
  def mergeLogTSV(l1: LogTSV, l2: LogTSV) : LogTSV= {
    (l1.action, l2.action) match {
-     case (UPDATE, DELETE) => l2
-     case (CREATE, DELETE) => l2
-     case (UPDATE, UPDATE) => l2.copy(attributes=rightWayMergeHashMap(l1.attributes, l2.attributes))
+     case (UPDATE, DELETE) => l2 // DELETE nullifies previous operations
+     case (CREATE, DELETE) => l2 // DELETE nullifies previous operations
+     case (UPDATE, UPDATE) => l2.copy(attributes=rightWayMergeHashMap(l1.attributes, l2.attributes)) // Could be either l1 or l2
      case (CREATE, UPDATE) => l1.copy(attributes=rightWayMergeHashMap(l2.attributes, l1.attributes))
-     case (_,_) => assert(1==2); l1;
-
+     case (_,_) => assert(1==2); l1; // Cases that should not happen. We assume the LogTSV are consistent and makes sense
+                                     // example (DELETE, DELETE), (DELETE, UPDATE) // These do not make sense
    }
  }
-// Attributes: HashMap(String,String)
+/** Merge two hashmaps with preference to the second parameter
+ *
+ * Could be made more general but not needed for this application.
+ * rightWayMergeHashMap[T](hashmap1:HashMap[T], hashmap2[T]):HashMap[T]
+ *
+ * Attributes is type alias for HashMap[(String,String)]
+ * @param attributes recessive HashMap
+ * @param attributes1 dominant HashMap
+ * @return merged HashMap
+ */
 def rightWayMergeHashMap(attributes: LTSV.Attributes, attributes1: LTSV.Attributes):LTSV.Attributes = {
     attributes.merged(attributes1)((_,y) => y)
   }
 
+/** Create graph from an initial list of LogTSVs
+ *
+ * @param logs Initial log entries
+ * @return new Graph
+ */
   def createGraph(logs:RDD[LogTSV]):Graph[Attributes,Attributes] = {
     // Might need to be re-implemented
     // vertices = ...
