@@ -75,55 +75,90 @@ object SnapshotDelta {
     }
   }
 
-  def snapShotCount(logs: RDD[LogTSV], numberOfActions: Int): SnapshotDelta[Attributes,Attributes] = {
+  def snapShotCount(logs: RDD[LogTSV], numberOfActions: Int): SnapshotDelta[Attributes, Attributes] = {
     val initialGraph = createGraph(logs.map(log => (log.sequentialId, log)).filterByRange(0, numberOfActions).map(_._2))
     val graphs = mutable.MutableList(initialGraph)
+
       for ( i <- 1 to (logs.count() / numberOfActions).ceil.toInt) {
-        // Get subset of logs
         val previousSnapshot = graphs(i - 1)
+
+        // Get subset of logs
         val logInterval = logs
           .map(log => (log.sequentialId, log))                           // Mapping like this makes it into a KeyValuePairRDD, which have some convenient methods
           .filterByRange(numberOfActions * i, numberOfActions * (i + 1)) // This lets ut get a slice of the LTSVs
           .map(_._2)                                                     // This maps the type into back to its original form
 
-        // Get all ids of vertices in the log interval
-        val vertexIds = logInterval.flatMap(getVertexIds)
+        val newVertices = applyVertexLogs(previousSnapshot, logInterval)
+        val newEdges = applyEdgeLogs(previousSnapshot, logInterval)
 
-        // Squash all actions on each vertex to one single action
-        val verticesWithAction = vertexIds.map(id => (id, logInterval.filter( log => log.objectType match {
-          case VERTEX(objId) => id == objId
-          case EDGE(_, _) => false
-        })))
-          .map(vertexWithActions => (vertexWithActions._1, mergeLogTSVs(vertexWithActions._2)))
-
-        // Get all ids of edges in the log interval
-        val edgeIds = logInterval.flatMap(getEdgeIds)
-
-        // Squash all actions on each edge to one single action
-        val edgesWithAction = edgeIds.map( id => (id, logInterval.filter( log => log.objectType match {
-          case VERTEX(_) => false // Didn't we talk about handling deletes in the end? Else this should be: id_1 ==objId || id._2 == objId
-          case EDGE(srcId, dstId) => id._1 == srcId && id._2 == dstId
-        })))
-          .map(edgeWithAction => (edgeWithAction._1, mergeLogTSVs(edgeWithAction._2)))
-          .map(edge => Edge(edge._1._1, edge._1._2, edge._2))
-
-        // We now need to get on the format
-        // (previousSnapshotEdge, newSnapshotAction)
-        // such that we map the previous state to the new state by merging attributes
-        // (this does also hold for vertices)
-
-        // We also need to add new edges to the edgeRDD when CREATE appears
-        // DELETES are not handled in edgesWithAction
-
-        // val updatedVertices = ..old vertices with new merged action applied..
-        // val updatedEdges = ..old edges with new merged action applied..
-        graphs += Graph(updatedVertices, updatedEdges)
+        graphs += Graph(newVertices, newEdges)
       })
 
-        Graph(vertices, edges)
-      } )
-  }
-  def mergeLogTSVs(logs:RDD[LogTSV]):LogTSV = logs.reduce(mergeLogTSV)
+    Graph(vertices, edges)
+  } )
+}
+def applyEdgeLogs(snapshot: Graph[LTSV.Attributes, LTSV.Attributes], logs: RDD[LogTSV]): RDD[Edge[Attributes]] = {
+  val previousSnapshotEdges = snapshot.edges.map(edge => ((edge.dstId, edge.srcId), edge.attr))
+
+  // Get all ids of edges in the log interval
+  val edgeIds = logs.flatMap(getEdgeIds)
+
+  // Squash all actions on each edge to one single action
+  val edgesWithAction = edgeIds.map(id => (id, logs.filter(log => log.objectType match {
+    case VERTEX(objId) => id._1 == objId || id._2 == objId
+    case EDGE(srcId, dstId) => id._1 == srcId && id._2 == dstId
+  })))
+    .map(edgeWithAction => (edgeWithAction._1, mergeLogTSVs(edgeWithAction._2)))
+
+  // Combine edges from the snapshot with the current log interval
+  val joinedEdges = previousSnapshotEdges.fullOuterJoin(edgesWithAction)
+
+  // Create, update or omit (delete) edges based on values are present or not.
+  val newSnapshotEdges = joinedEdges.flatMap(x => x._2 match {
+    case (Some(snapshotEdge), None) => Some(Edge(x._1._1, x._1._2, snapshotEdge))
+    case (Some(snapshotEdge), Some(newEdge)) => newEdge match {
+      case newEdge.action == DELETE => None
+      case newEdge.action == UPDATE => Some(Edge(x._1._1, x._1._2, rightWayMergeHashMap(snapshotEdge, newEdge.attributes)))
+    }
+    case (None, Some(newEdge)) => newEdge match {
+      case newEdge.action == DELETE => None
+      case newEdge.action == UPDATE => Some(Edge(x._1._1, x._1._2, newEdge.attributes))
+    }
+  })
+  newSnapshotEdges
+}
+def applyVertexLogs(snapshot: Graph[LTSV.Attributes, LTSV.Attributes], logs: RDD[LogTSV]): RDD[(VertexId, Attributes)] = {
+  val previousSnapshotVertices = snapshot.vertices.map(vertex => (vertex._1, vertex._2))
+
+  // Get all ids of vertices in the log interval
+  val vertexIds = logs.flatMap(getVertexIds)
+
+  // Squash all actions on each vertex to one single action
+  val verticesWithAction = vertexIds.map(id => (id, logs.filter(log => log.objectType match {
+    case VERTEX(objId) => id == objId
+    case EDGE(_, _) => false
+  })))
+    .map(vertexWithActions => (vertexWithActions._1, mergeLogTSVs(vertexWithActions._2)))
+
+  // Combine vertices from the snapshot with the current log interval
+  val joinedVertices = previousSnapshotVertices.fullOuterJoin(verticesWithAction)
+
+  // Create, update or omit (delete) vertices based on values are present or not.
+  val newSnapshotVertices = joinedVertices.flatMap(x => x._2 match {
+    case (Some(snapshotVertex), None) => Some((x._1, snapshotVertex))
+    case (Some(snapshotVertex), Some(newVertex)) => newVertex match {
+      case newVertex.action == DELETE => None
+      case newVertex.action == UPDATE => Some((x._1, rightWayMergeHashMap(snapshotVertex, newVertex.attributes)))
+    }
+    case (None, Some(newVertex)) => newVertex match {
+      case newVertex.action == DELETE => None
+      case newVertex.action == UPDATE => Some((x._1, newVertex.attributes))
+    }
+  })
+  newSnapshotVertices
+}
+
+def mergeLogTSVs(logs:RDD[LogTSV]):LogTSV = logs.reduce(mergeLogTSV)
 
  def mergeLogTSV(l1: LogTSV, l2: LogTSV) : LogTSV= {
    (l1.action, l2.action) match {
@@ -135,18 +170,15 @@ object SnapshotDelta {
                                      // example (DELETE, DELETE), (DELETE, UPDATE) // These do not make sense
    }
  }
-/** Merge two hashmaps with preference to the second parameter
- *
- * Could be made more general but not needed for this application.
- * rightWayMergeHashMap[T](hashmap1:HashMap[T], hashmap2[T]):HashMap[T]
- *
+/** Merge two hashmaps with preference for dominantAttributes
+
  * Attributes is type alias for HashMap[(String,String)]
  * @param attributes recessive HashMap
- * @param attributes1 dominant HashMap
+ * @param dominantAttributes dominant HashMap
  * @return merged HashMap
  */
-def rightWayMergeHashMap(attributes: LTSV.Attributes, attributes1: LTSV.Attributes):LTSV.Attributes = {
-    attributes.merged(attributes1)((_,y) => y)
+def rightWayMergeHashMap(attributes: LTSV.Attributes, dominantAttributes: LTSV.Attributes): LTSV.Attributes = {
+    attributes.merged(dominantAttributes)((_, y) => y)
   }
 
 // Could maybe be RDD[LogTSV] -> RDD[Long] instead
@@ -157,13 +189,14 @@ def rightWayMergeHashMap(attributes: LTSV.Attributes, attributes1: LTSV.Attribut
 // edgeIds = getEdgeIds(logs)
 // (The types would of course prove the assumption wrong, but it's nice
 // either way
-def getEdgeIds(log:LogTSV):Option[(Long,Long)] = {
+def getEdgeIds(log: LogTSV): Option[(Long,Long)] = {
   log.objectType match {
-    case VERTEX(objId) => None
+    case VERTEX(_) => None
     case EDGE(srcId, dstId) => Some(srcId,dstId)
   }
 }
-def getVertexIds(log:LogTSV):Option[Long] = {
+
+def getVertexIds(log: LogTSV): Option[Long] = {
   log.objectType match {
     case VERTEX(objId) => Some(objId)
     case EDGE(_, _) => None
