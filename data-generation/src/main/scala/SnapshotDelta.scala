@@ -5,10 +5,10 @@ import org.apache.spark.graphx._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 
-import scala.collection.mutable
+import scala.collection.mutable.MutableList
 import scala.reflect.ClassTag
 
-class SnapshotDelta[VD: ClassTag, ED: ClassTag](val graphs: List[Graph[Attributes, Attributes]], val logs:RDD[LogTSV]) extends Graph[VD, ED] {
+class SnapshotDelta[VD: ClassTag, ED: ClassTag](val graphs: MutableList[Graph[Attributes, Attributes]], val logs:RDD[LogTSV]) extends Graph[VD, ED] {
   override val vertices: VertexRDD[VD] = graph.vertices
   override val edges: EdgeRDD[ED] = graph.edges
   override val triplets: RDD[EdgeTriplet[VD, ED]] = graph.triplets
@@ -57,18 +57,8 @@ object SnapshotIntervalType {
   final case class Count(numberOfActions:Int) extends SnapshotIntervalType
 }
 
-object SnapshotDelta {
-  // Delete me
-  def apply[VD: ClassTag, ED: ClassTag](
-                                         vertices: RDD[(VertexId, VD)],
-                                         edges: RDD[Edge[ED]],
-                                         defaultVertexAttr: VD = null.asInstanceOf[VD],
-                                         edgeStorageLevel: StorageLevel = StorageLevel.MEMORY_ONLY,
-                                         vertexStorageLevel: StorageLevel = StorageLevel.MEMORY_ONLY): Graph[VD, ED] = {
-    SnapshotDelta(vertices, edges)
-  }
-
-  def create[VD,ED](logs:RDD[LogTSV], snapType: SnapshotIntervalType):SnapshotDelta[VD,ED] = {
+object SnapshotDeltaObject {
+  def create[VD,ED](logs: RDD[LogTSV], snapType: SnapshotIntervalType): SnapshotDelta[Attributes, Attributes] = {
     snapType match {
       case SnapshotIntervalType.Time(duration) => snapShotTime(logs, duration)
       case SnapshotIntervalType.Count(numberOfActions) => snapShotCount(logs, numberOfActions)
@@ -77,7 +67,7 @@ object SnapshotDelta {
 
   def snapShotCount(logs: RDD[LogTSV], numberOfActions: Int): SnapshotDelta[Attributes, Attributes] = {
     val initialGraph = createGraph(logs.map(log => (log.sequentialId, log)).filterByRange(0, numberOfActions).map(_._2))
-    val graphs = mutable.MutableList(initialGraph)
+    val graphs = MutableList(initialGraph)
 
       for ( i <- 1 to (logs.count() / numberOfActions).ceil.toInt) {
         val previousSnapshot = graphs(i - 1)
@@ -92,26 +82,17 @@ object SnapshotDelta {
         val newEdges = applyEdgeLogs(previousSnapshot, logInterval)
 
         graphs += Graph(newVertices, newEdges)
-      })
-
-    Graph(vertices, edges)
-  } )
+      }
+    new SnapshotDelta(graphs, logs)
+  }
 }
 def applyEdgeLogs(snapshot: Graph[LTSV.Attributes, LTSV.Attributes], logs: RDD[LogTSV]): RDD[Edge[Attributes]] = {
   val previousSnapshotEdges = snapshot.edges.map(edge => ((edge.dstId, edge.srcId), edge.attr))
 
-  // Get all ids of edges in the log interval
-  val edgeIds = logs.flatMap(getEdgeIds)
-
-  // Squash all actions on each edge to one single action
-  val edgesWithAction = edgeIds.map(id => (id, logs.filter(log => log.objectType match {
-    case VERTEX(objId) => id._1 == objId || id._2 == objId
-    case EDGE(srcId, dstId) => id._1 == srcId && id._2 == dstId
-  })))
-    .map(edgeWithAction => (edgeWithAction._1, mergeLogTSVs(edgeWithAction._2)))
+  val squashedEdgeActions = getSquashedEdgeActions(logs)
 
   // Combine edges from the snapshot with the current log interval
-  val joinedEdges = previousSnapshotEdges.fullOuterJoin(edgesWithAction)
+  val joinedEdges = previousSnapshotEdges.fullOuterJoin(squashedEdgeActions)
 
   // Create, update or omit (delete) edges based on values are present or not.
   val newSnapshotEdges = joinedEdges.flatMap(x => x._2 match {
@@ -127,18 +108,24 @@ def applyEdgeLogs(snapshot: Graph[LTSV.Attributes, LTSV.Attributes], logs: RDD[L
   })
   newSnapshotEdges
 }
+
+def getSquashedEdgeActions(logs: RDD[LogTSV]): RDD[((Long, Long), LogTSV)] = {
+  // Get all ids of edges in the log interval
+  val edgeIds = logs.flatMap(getEdgeIds)
+
+  // Squash all actions on each edge to one single action
+  val edgesWithAction = edgeIds.map(id => (id, logs.filter(log => log.objectType match {
+    case VERTEX(objId) => id._1 == objId || id._2 == objId
+    case EDGE(srcId, dstId) => id._1 == srcId && id._2 == dstId
+  })))
+    .map(edgeWithAction => (edgeWithAction._1, mergeLogTSVs(edgeWithAction._2)))
+  edgesWithAction
+}
+
 def applyVertexLogs(snapshot: Graph[LTSV.Attributes, LTSV.Attributes], logs: RDD[LogTSV]): RDD[(VertexId, Attributes)] = {
   val previousSnapshotVertices = snapshot.vertices.map(vertex => (vertex._1, vertex._2))
 
-  // Get all ids of vertices in the log interval
-  val vertexIds = logs.flatMap(getVertexIds)
-
-  // Squash all actions on each vertex to one single action
-  val verticesWithAction = vertexIds.map(id => (id, logs.filter(log => log.objectType match {
-    case VERTEX(objId) => id == objId
-    case EDGE(_, _) => false
-  })))
-    .map(vertexWithActions => (vertexWithActions._1, mergeLogTSVs(vertexWithActions._2)))
+  val verticesWithAction: RDD[(Long, LogTSV)] = getSquashedVertexActions(logs)
 
   // Combine vertices from the snapshot with the current log interval
   val joinedVertices = previousSnapshotVertices.fullOuterJoin(verticesWithAction)
@@ -156,6 +143,19 @@ def applyVertexLogs(snapshot: Graph[LTSV.Attributes, LTSV.Attributes], logs: RDD
     }
   })
   newSnapshotVertices
+}
+
+def getSquashedVertexActions(logs: RDD[LogTSV]): RDD[(Long, LogTSV)] = {
+  // Get all ids of vertices in the log interval
+  val vertexIds = logs.flatMap(getVertexIds)
+
+  // Squash all actions on each vertex to one single action
+  val verticesWithAction = vertexIds.map(id => (id, logs.filter(log => log.objectType match {
+    case VERTEX(objId) => id == objId
+    case EDGE(_, _) => false
+  })))
+    .map(vertexWithActions => (vertexWithActions._1, mergeLogTSVs(vertexWithActions._2)))
+  verticesWithAction
 }
 
 def mergeLogTSVs(logs:RDD[LogTSV]):LogTSV = logs.reduce(mergeLogTSV)
@@ -208,14 +208,27 @@ def getVertexIds(log: LogTSV): Option[Long] = {
  * @param logs Initial log entries
  * @return new Graph
  */
-  def createGraph(logs:RDD[LogTSV]):Graph[Attributes,Attributes] = {
-    // Might need to be re-implemented
-    // vertices = ...
-    // edges = ...
-    val vertexIds = logs.flatMap(getEdgeIds)
+  def createGraph(logs: RDD[LogTSV]): Graph[Attributes, Attributes] = {
+    val firstSnapshotVertices = getInitialVerticesFromLogs(logs)
+    val firstSnapshotEdges = getInitialEdgesFromLogs(logs)
 
-    val edgeIds = logs.flatMap(getEdgeIds)
-
-      Graph(vertices, edges)
+      Graph(firstSnapshotVertices, firstSnapshotEdges)
   }
-}
+
+  def getInitialVerticesFromLogs(logs: RDD[LogTSV]): RDD[(VertexId, Attributes)] = {
+    val verticesWithAction = getSquashedVertexActions(logs)
+    verticesWithAction.flatMap(vertexTuple => vertexTuple._2.action match {
+      case Action.CREATE => Some(vertexTuple._1, vertexTuple._2.attributes)
+      case Action.DELETE => None
+      case Action.UPDATE => assert (1 == 2); None
+    })
+  }
+
+  def getInitialEdgesFromLogs(logs: RDD[LogTSV]): RDD[Edge[Attributes]] = {
+    val edgesWithAction = getSquashedEdgeActions(logs)
+    edgesWithAction.flatMap(edge => edge._2.action match {
+      case Action.CREATE => Some(Edge(edge._1._1, edge._1._2, edge._2.attributes))
+      case Action.DELETE => None
+      case Action.UPDATE => assert (1 == 2); None
+    })
+  }
