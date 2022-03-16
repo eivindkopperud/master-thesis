@@ -7,13 +7,12 @@ import org.apache.spark.storage.StorageLevel
 
 import scala.collection.mutable
 import scala.collection.mutable.MutableList
-import scala.reflect.ClassTag
 
-class SnapshotDelta[VD: ClassTag, ED: ClassTag](val graphs: MutableList[Graph[Attributes, Attributes]], val logs:RDD[LogTSV]) extends Graph[VD, ED] {
-  override val vertices: VertexRDD[VD] = graph.vertices
-  override val edges: EdgeRDD[ED] = graph.edges
-  override val triplets: RDD[EdgeTriplet[VD, ED]] = graph.triplets
-
+class SnapshotDelta(val graphs: MutableList[Graph[Attributes, Attributes]], val logs:RDD[LogTSV]) {// extends Graph[VD, ED] {
+  val vertices: VertexRDD[Attributes] = graphs.get(0).get.vertices
+  val edges: EdgeRDD[Attributes] = graphs.get(0).get.edges
+  val triplets: RDD[EdgeTriplet[Attributes, Attributes]] = graphs.get(0).get.triplets
+/*
   override def persist(newLevel: StorageLevel): Graph[VD, ED] = graph.persist(newLevel)
 
   override def cache(): Graph[VD, ED] = graph.cache
@@ -49,6 +48,7 @@ class SnapshotDelta[VD: ClassTag, ED: ClassTag](val graphs: MutableList[Graph[At
 
   override def outerJoinVertices[U, VD2](other: RDD[(VertexId, U)])(mapFunc: (VertexId, VD, Option[U]) => VD2)(implicit evidence$13: ClassTag[U], evidence$14: ClassTag[VD2], eq: VD =:= VD2): Graph[VD2, ED] =
     graph.outerJoinVertices(other)(mapFunc)(evidence$13, evidence$14, eq)
+ */
 }
 
 
