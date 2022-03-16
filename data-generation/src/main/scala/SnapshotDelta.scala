@@ -5,6 +5,7 @@ import org.apache.spark.graphx._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 
+import scala.collection.mutable
 import scala.collection.mutable.MutableList
 import scala.reflect.ClassTag
 
@@ -61,13 +62,13 @@ object SnapshotDeltaObject {
   def create[VD,ED](logs: RDD[LogTSV], snapType: SnapshotIntervalType): SnapshotDelta[Attributes, Attributes] = {
     snapType match {
       case SnapshotIntervalType.Time(duration) => snapShotTime(logs, duration)
-      case SnapshotIntervalType.Count(numberOfActions) => snapShotCount(logs, numberOfActions)
+      case SnapshotIntervalType.Count(numberOfActions) => createSnapShotCountModel(logs, numberOfActions)
     }
   }
 
-  def snapShotCount(logs: RDD[LogTSV], numberOfActions: Int): SnapshotDelta[Attributes, Attributes] = {
+  def createSnapShotCountModel(logs: RDD[LogTSV], numberOfActions: Int): SnapshotDelta[Attributes, Attributes] = {
     val initialGraph = createGraph(logs.map(log => (log.sequentialId, log)).filterByRange(0, numberOfActions).map(_._2))
-    val graphs = MutableList(initialGraph)
+    val graphs = mutable.MutableList(initialGraph)
 
       for ( i <- 1 to (logs.count() / numberOfActions).ceil.toInt) {
         val previousSnapshot = graphs(i - 1)
@@ -78,7 +79,7 @@ object SnapshotDeltaObject {
           .filterByRange(numberOfActions * i, numberOfActions * (i + 1)) // This lets ut get a slice of the LTSVs
           .map(_._2)                                                     // This maps the type into back to its original form
 
-        val newVertices = applyVertexLogs(previousSnapshot, logInterval)
+        val newVertices = applyVertexLogsToSnapshot(previousSnapshot, logInterval)
         val newEdges = applyEdgeLogs(previousSnapshot, logInterval)
 
         graphs += Graph(newVertices, newEdges)
@@ -87,65 +88,74 @@ object SnapshotDeltaObject {
   }
 }
 def applyEdgeLogs(snapshot: Graph[LTSV.Attributes, LTSV.Attributes], logs: RDD[LogTSV]): RDD[Edge[Attributes]] = {
-  val previousSnapshotEdges = snapshot.edges.map(edge => ((edge.dstId, edge.srcId), edge.attr))
+  val previousSnapshotEdgesKV = snapshot.edges.map(edge => ((edge.dstId, edge.srcId), edge.attr))
 
-  val squashedEdgeActions = getSquashedEdgeActions(logs)
+  val squashedEdgeActions = getSquashedActionsByEdgeId(logs)
 
   // Combine edges from the snapshot with the current log interval
-  val joinedEdges = previousSnapshotEdges.fullOuterJoin(squashedEdgeActions)
+  val joinedEdges = previousSnapshotEdgesKV.fullOuterJoin(squashedEdgeActions)
 
   // Create, update or omit (delete) edges based on values are present or not.
-  val newSnapshotEdges = joinedEdges.flatMap(x => x._2 match {
-    case (Some(snapshotEdge), None) => Some(Edge(x._1._1, x._1._2, snapshotEdge))
-    case (Some(snapshotEdge), Some(newEdge)) => newEdge match {
-      case newEdge.action == DELETE => None
-      case newEdge.action == UPDATE => Some(Edge(x._1._1, x._1._2, rightWayMergeHashMap(snapshotEdge, newEdge.attributes)))
+  val newSnapshotEdges = joinedEdges.flatMap(outerJoinedEdge => outerJoinedEdge._2 match {
+    case (Some(previousEdge), None) => Some(Edge(outerJoinedEdge._1._1, outerJoinedEdge._1._2, previousEdge)) // Edge existed in the last snapshot, but no changes were done in this interval
+    case (Some(previousEdge), Some(newEdgeAction)) => newEdgeAction match {                 // There has been a change to the edge in the interval
+      case newEdgeAction.action == DELETE => None                                           // Edge or {source,destination} vertex was deleted in the new interval
+      case newEdgeAction.action == UPDATE =>                                                // Edge updated in this interval
+        Some(Edge(outerJoinedEdge._1._1, outerJoinedEdge._1._2, rightWayMergeHashMap(previousEdge, newEdgeAction.attributes)))
     }
-    case (None, Some(newEdge)) => newEdge match {
-      case newEdge.action == DELETE => None
-      case newEdge.action == UPDATE => Some(Edge(x._1._1, x._1._2, newEdge.attributes))
+    case (None, Some(newEdgeAction)) => newEdgeAction match {                               // Edge was introduced in this interval
+      case newEdgeAction.action == DELETE => None                                           // Edge was introduced then promptly deleted (possibly due to a deleted vertex)
+      case newEdgeAction.action == CREATE =>                                                // Edge was created
+        Some(Edge(outerJoinedEdge._1._1, outerJoinedEdge._1._2, newEdgeAction.attributes))
+      case newEdgeAction.action == UPDATE =>                                                // Edge was created and had an update
+        Some(Edge(outerJoinedEdge._1._1, outerJoinedEdge._1._2, newEdgeAction.attributes))
     }
   })
   newSnapshotEdges
 }
 
-def getSquashedEdgeActions(logs: RDD[LogTSV]): RDD[((Long, Long), LogTSV)] = {
+// We are makin the assumption that there can only be one edge between two nodes. We might have to create a surrogate key
+def getSquashedActionsByEdgeId(logs: RDD[LogTSV]): RDD[((Long, Long), LogTSV)] = {
   // Get all ids of edges in the log interval
   val edgeIds = logs.flatMap(getEdgeIds)
 
   // Squash all actions on each edge to one single action
-  val edgesWithAction = edgeIds.map(id => (id, logs.filter(log => log.objectType match {
-    case VERTEX(objId) => id._1 == objId || id._2 == objId
-    case EDGE(srcId, dstId) => id._1 == srcId && id._2 == dstId
+  val edgesWithAction = edgeIds.map(edgeIDs => (edgeIDs, logs.filter(log => log.objectType match {
+    case VERTEX(objId) => (edgeIDs._1 == objId || edgeIDs._2 == objId) && log.action == DELETE // Vertex DELETES means that the edge is deleted as well
+    case EDGE(srcId, dstId) => edgeIDs._1 == srcId && edgeIDs._2 == dstId
   })))
     .map(edgeWithAction => (edgeWithAction._1, mergeLogTSVs(edgeWithAction._2)))
   edgesWithAction
 }
 
-def applyVertexLogs(snapshot: Graph[LTSV.Attributes, LTSV.Attributes], logs: RDD[LogTSV]): RDD[(VertexId, Attributes)] = {
+def applyVertexLogsToSnapshot(snapshot: Graph[LTSV.Attributes, LTSV.Attributes], logs: RDD[LogTSV]): RDD[(VertexId, Attributes)] = {
   val previousSnapshotVertices = snapshot.vertices.map(vertex => (vertex._1, vertex._2))
 
-  val verticesWithAction: RDD[(Long, LogTSV)] = getSquashedVertexActions(logs)
+  val vertexIDsWithAction: RDD[(Long, LogTSV)] = getSquashedActionsByVertexId(logs)
 
   // Combine vertices from the snapshot with the current log interval
-  val joinedVertices = previousSnapshotVertices.fullOuterJoin(verticesWithAction)
+  val joinedVertices = previousSnapshotVertices.fullOuterJoin(vertexIDsWithAction)
 
   // Create, update or omit (delete) vertices based on values are present or not.
-  val newSnapshotVertices = joinedVertices.flatMap(x => x._2 match {
-    case (Some(snapshotVertex), None) => Some((x._1, snapshotVertex))
-    case (Some(snapshotVertex), Some(newVertex)) => newVertex match {
-      case newVertex.action == DELETE => None
-      case newVertex.action == UPDATE => Some((x._1, rightWayMergeHashMap(snapshotVertex, newVertex.attributes)))
+  val newSnapshotVertices = joinedVertices.flatMap(outerJoinedVertex => outerJoinedVertex._2 match {
+    case (Some(snapshotVertex), None) => Some((outerJoinedVertex._1, snapshotVertex)) // No changes to the vertex in this interval
+    case (Some(snapshotVertex), Some(newVertex)) => newVertex match {                 // Changes to the vertex in this interval
+      case newVertex.action == DELETE => None                                         // Vertex was deleted
+      case newVertex.action == UPDATE =>                                              // Vertex was updated
+        Some((outerJoinedVertex._1, rightWayMergeHashMap(snapshotVertex, newVertex.attributes)))
     }
-    case (None, Some(newVertex)) => newVertex match {
-      case newVertex.action == DELETE => None
-      case newVertex.action == UPDATE => Some((x._1, newVertex.attributes))
+    case (None, Some(newVertex)) => newVertex match {                                 // Vertex was introduced in this interval
+      case newVertex.action == DELETE => None                                         // Vertex was introduced then promptly deleted
+      case newVertex.action == CREATE =>                                              // Vertex was created
+        Some((outerJoinedVertex._1, newVertex.attributes))
+      case newVertex.action == UPDATE =>                                              // Vertex was created and had an update
+        Some((outerJoinedVertex._1, newVertex.attributes))
     }
   })
   newSnapshotVertices
 }
 
-def getSquashedVertexActions(logs: RDD[LogTSV]): RDD[(Long, LogTSV)] = {
+def getSquashedActionsByVertexId(logs: RDD[LogTSV]): RDD[(Long, LogTSV)] = {
   // Get all ids of vertices in the log interval
   val vertexIds = logs.flatMap(getVertexIds)
 
@@ -164,7 +174,7 @@ def mergeLogTSVs(logs:RDD[LogTSV]):LogTSV = logs.reduce(mergeLogTSV)
    (l1.action, l2.action) match {
      case (UPDATE, DELETE) => l2 // DELETE nullifies previous operations
      case (CREATE, DELETE) => l2 // DELETE nullifies previous operations
-     case (UPDATE, UPDATE) => l2.copy(attributes=rightWayMergeHashMap(l1.attributes, l2.attributes)) // Could be either l1 or l2
+     case (UPDATE, UPDATE) => l2.copy(attributes=rightWayMergeHashMap(l1.attributes, l2.attributes)) // Could be either l1 or l2 that is copied
      case (CREATE, UPDATE) => l1.copy(attributes=rightWayMergeHashMap(l2.attributes, l1.attributes))
      case (_,_) => assert(1==2); l1; // Cases that should not happen. We assume the LogTSV are consistent and makes sense
                                      // example (DELETE, DELETE), (DELETE, UPDATE) // These do not make sense
@@ -216,19 +226,19 @@ def getVertexIds(log: LogTSV): Option[Long] = {
   }
 
   def getInitialVerticesFromLogs(logs: RDD[LogTSV]): RDD[(VertexId, Attributes)] = {
-    val verticesWithAction = getSquashedVertexActions(logs)
+    val verticesWithAction = getSquashedActionsByVertexId(logs)
     verticesWithAction.flatMap(vertexTuple => vertexTuple._2.action match {
-      case Action.CREATE => Some(vertexTuple._1, vertexTuple._2.attributes)
-      case Action.DELETE => None
-      case Action.UPDATE => assert (1 == 2); None
+      case Action.CREATE => Some(vertexTuple._1, vertexTuple._2.attributes) // Vertex was created
+      case Action.DELETE => None                                            // Vertex was created and deleted
+      case Action.UPDATE => Some(vertexTuple._1, vertexTuple._2.attributes) // Vertex was created and updated
     })
   }
 
   def getInitialEdgesFromLogs(logs: RDD[LogTSV]): RDD[Edge[Attributes]] = {
-    val edgesWithAction = getSquashedEdgeActions(logs)
+    val edgesWithAction = getSquashedActionsByEdgeId(logs)
     edgesWithAction.flatMap(edge => edge._2.action match {
-      case Action.CREATE => Some(Edge(edge._1._1, edge._1._2, edge._2.attributes))
-      case Action.DELETE => None
-      case Action.UPDATE => assert (1 == 2); None
+      case Action.CREATE => Some(Edge(edge._1._1, edge._1._2, edge._2.attributes)) // Edge was created
+      case Action.DELETE => None                                                   // Edge was created and deleted (Possibly because of a deleted vertex)
+      case Action.UPDATE => Some(Edge(edge._1._1, edge._1._2, edge._2.attributes)) // Edge was created and updated
     })
   }
