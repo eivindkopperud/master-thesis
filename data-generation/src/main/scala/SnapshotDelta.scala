@@ -62,7 +62,7 @@ object SnapshotDeltaObject {
   def create[VD,ED](logs: RDD[LogTSV], snapType: SnapshotIntervalType): SnapshotDelta[Attributes, Attributes] = {
     snapType match {
       case SnapshotIntervalType.Time(duration) => snapShotTime(logs, duration)
-      case SnapshotIntervalType.Count(numberOfActions) => createSnapShotCountModel(logs, numberOfActions)
+      case SnapshotIntervalType.Count(numberOfActions) => createSnapshotCountModel(logs, numberOfActions)
     }
   }
 
