@@ -107,8 +107,8 @@ def applyEdgeLogs(snapshot: Graph[LTSV.Attributes, LTSV.Attributes], logs: RDD[L
       case DELETE => None                                           // Edge was introduced then promptly deleted (possibly due to a deleted vertex)
       case CREATE =>                                                // Edge was created
         Some(Edge(outerJoinedEdge._1._1, outerJoinedEdge._1._2, newEdgeAction.attributes))
-      case UPDATE =>                                                // Edge was created and had an update
-        Some(Edge(outerJoinedEdge._1._1, outerJoinedEdge._1._2, newEdgeAction.attributes))
+      case _ =>                                                     // An UPDATE should never happen if it's new because how merging of LogTSVs are done
+        assert(1==2); None
     }
   })
   newSnapshotEdges
@@ -148,8 +148,8 @@ def applyVertexLogsToSnapshot(snapshot: Graph[LTSV.Attributes, LTSV.Attributes],
       case DELETE => None                                                             // Vertex was introduced then promptly deleted
       case CREATE =>                                                                  // Vertex was created
         Some((outerJoinedVertex._1, newVertex.attributes))
-      case UPDATE =>                                                                  // Vertex was created and had an update
-        Some((outerJoinedVertex._1, newVertex.attributes))
+      case _ =>                                                                       // An UPDATE should never happen if the vertex is new in the interval, because of the way we merge LogTSVs
+        assert(1==2); None;
     }
   })
   newSnapshotVertices
