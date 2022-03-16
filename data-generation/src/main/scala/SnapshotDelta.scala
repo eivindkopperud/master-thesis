@@ -66,7 +66,7 @@ object SnapshotDeltaObject {
     }
   }
 
-  def createSnapShotCountModel(logs: RDD[LogTSV], numberOfActions: Int): SnapshotDelta[Attributes, Attributes] = {
+  def createSnapshotCountModel(logs: RDD[LogTSV], numberOfActions: Int): SnapshotDelta[Attributes, Attributes] = {
     val initialGraph = createGraph(logs.map(log => (log.sequentialId, log)).filterByRange(0, numberOfActions).map(_._2))
     val graphs = mutable.MutableList(initialGraph)
 
