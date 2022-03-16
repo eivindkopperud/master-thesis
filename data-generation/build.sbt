@@ -12,6 +12,7 @@ libraryDependencies ++= Seq(
   "com.github.javafaker" % "javafaker" % "1.0.2",
   "org.scalanlp" %% "breeze" % "1.2",
   "org.scalanlp" %% "breeze-viz" % "1.2",
+  "org.scalatest" %% "scalatest" % "3.2.11" % "test"
 )
 
 
