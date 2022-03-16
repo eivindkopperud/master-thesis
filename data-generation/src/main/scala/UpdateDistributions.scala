@@ -2,7 +2,8 @@ import DistributionType.LogNormalType
 import breeze.plot.{Figure, hist}
 import breeze.stats.distributions.{Gaussian, LogNormal}
 import org.apache.spark.SparkContext
-import org.apache.spark.graphx.{Edge, Graph, VertexId}
+import org.apache.spark.graphx.{Edge, Graph, VertexId, VertexRDD}
+import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
 
@@ -32,41 +33,35 @@ object UpdateDistributions {
    * @param mu           Expected value
    * @param sigma        Standard deviation
    * @return */
-  def addVertexUpdateDistribution[VD, ED: ClassTag](sc: SparkContext, graph: Graph[VD, ED], mode: CorrelationMode, distribution: DistributionType): Graph[Int, ED] = {
-    val graphWithDegree = graph
-      .vertices
-      .zip(graph.ops.degrees)
-      .map(vertex => (vertex._1._1, vertex._2._2))
-      .collect()
-      .sortBy(vertexTuple => vertexTuple)(getVertexSorting(mode))
+  def addVertexUpdateDistribution[VD: ClassTag, ED: ClassTag](sc: SparkContext, graph: Graph[VD, ED], mode: CorrelationMode, distribution: DistributionType): Graph[Int, ED] = {
+    val verticesWithDegree: RDD[(VertexId, Int)] = sortVertexByMode(graph.ops.degrees, mode)
 
-    val updates = graph.mapVertices((_, _) => getDistributionDraw(distribution))
+    val updates:RDD[Int] = graph.mapVertices((_, _) => getDistributionDraw(distribution))
       .vertices
       .collect()
       .sortBy(_._2)
       .map(_._2)
 
-    val rdd = sc.parallelize(
-      graphWithDegree
+    val vertices = verticesWithDegree
         .zip(updates)
         .map(vertex => (vertex._1._1, vertex._2))
-    )
 
-    Graph[Int, ED](rdd, graph.edges)
+    Graph[Int, ED](vertices, graph.edges)
   }
 
-  /** Get a vertex ordering rule based on a distribution mode
+  /** Sorts vertex weights based on the mode
    *
    * @param mode Indicates the mode of which the nodes are ordered by
-   * @return A Ordering function
+   * @return Sorted RDD
    * */
-  private def getVertexSorting(mode: CorrelationMode): Ordering[(VertexId, Int)] = {
+  private def sortVertexByMode(vertices: VertexRDD[Int], mode: CorrelationMode ): RDD[(VertexId, Int)] = {
     mode match {
-      case CorrelationMode.Uniform => (x: (VertexId, Int), y: (VertexId, Int)) => x.hashCode() compareTo y.hashCode()
-      case CorrelationMode.PositiveCorrelation => (x: (VertexId, Int), y: (VertexId, Int)) => x._2 compareTo y._2
-      case CorrelationMode.NegativeCorrelation => (x: (VertexId, Int), y: (VertexId, Int)) => y._2 compareTo x._2
+      case CorrelationMode.Uniform => vertices.sortBy(_.hashCode())
+      case CorrelationMode.PositiveCorrelation => vertices.sortBy(_._2, ascending = true)
+      case CorrelationMode.NegativeCorrelation => vertices.sortBy(_._2, ascending = false)
     }
   }
+}
 
   /** Add an update count to all edges
    *
