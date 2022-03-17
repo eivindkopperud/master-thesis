@@ -1,4 +1,4 @@
-import Action.UPDATE
+import Action.{CREATE, UPDATE,DELETE}
 import DistributionType.LogNormalType
 import Entity.{EDGE, VERTEX}
 import LTSV.Attributes
@@ -30,7 +30,12 @@ object DistributionType {
   final case class UniformType(low:Double, high: Double) extends DistributionType
 }
 
+final case class IntervalAndUpdateCount(interval:TimeInterval, count: Int)
+final case class IntervalAndDegrees(interval:TimeInterval, degree: Int)
+
 object UpdateDistributions {
+
+  // This function should only have VertexRDD[VD] as input. The edges are are not relevant
 
   /** Add an update count to all nodes
    *
@@ -38,9 +43,8 @@ object UpdateDistributions {
    * @param graph        A graph
    * @param mode         Mode for distributing the weights based on vertex degree
    * @param distribution Some probability distribution
-   * @param mu           Expected value
-   * @param sigma        Standard deviation
-   * @return */
+   * @return             Processed graph
+   */
   def addVertexUpdateDistribution[VD: ClassTag, ED: ClassTag](sc: SparkContext, graph: Graph[VD, ED], mode: CorrelationMode, distribution: DistributionType): Graph[Int, ED] = {
     val verticesWithDegree: RDD[(VertexId, Int)] = sortVertexByMode(graph.ops.degrees, mode)
 
@@ -76,7 +80,7 @@ object UpdateDistributions {
    * @param mode         Mode for distributing the weights based on vertex degree
    * @param distribution Some probability distribution
    * @return */
-  def addEdgeUpdateDistribution[VD, ED: ClassTag](sc: SparkContext, graph: Graph[Int, ED], mode: CorrelationMode, distribution: DistributionType): Graph[Int, Int] = {
+  def addEdgeUpdateDistribution[VD](sc: SparkContext, graph: Graph[Int, TimeInterval], mode: CorrelationMode, distribution: DistributionType): Graph[Int, IntervalAndUpdateCount] = {
     //The HashMap is never updated?
     val vertexUpdateHashMap = graph
       .vertices
@@ -84,7 +88,7 @@ object UpdateDistributions {
       .toMap
 
     val EdgesWithDegree = graph
-      .mapEdges(edge => getVertexUpdateSum[ED](edge, vertexUpdateHashMap))
+      .mapEdges(edge => IntervalAndDegrees(edge.attr,getVertexUpdateSum(edge, vertexUpdateHashMap)))
       .edges
       .collect()
       .sortBy(edge => edge)(getEdgeSorting(mode)) // this can be rewritten the same way as addVertexUpdateDistribution
@@ -99,10 +103,12 @@ object UpdateDistributions {
     val edgesWithUpdateCount = sc.parallelize(
       EdgesWithDegree
         .zip(numberOfUpdates)
-        .map(edgeAndCount => Edge(edgeAndCount._1.srcId, edgeAndCount._1.dstId, edgeAndCount._2))
+        .map(edgeAndCount =>
+          Edge(edgeAndCount._1.srcId, edgeAndCount._1.dstId, IntervalAndUpdateCount(edgeAndCount._1.attr.interval, edgeAndCount._2)))
     )
-    Graph[Int, Int](graph.vertices, edgesWithUpdateCount)
+    Graph[Int, IntervalAndUpdateCount](graph.vertices, edgesWithUpdateCount)
   }
+
 
   /**
    *
@@ -114,11 +120,12 @@ object UpdateDistributions {
     hashMap.getOrElse(edge.srcId, 0) + hashMap.getOrElse(edge.dstId, 0)
   }
 
-  private def getEdgeSorting(mode: CorrelationMode): Ordering[Edge[Int]] = {
+  private def getEdgeSorting(mode: CorrelationMode): Ordering[Edge[IntervalAndDegrees]] = {
+    type x = (TimeInterval, Int)
     mode match {
       case CorrelationMode.Uniform => (x: Edge[_], y: Edge[_]) => x.hashCode() compareTo y.hashCode() // We want no correlation so they are ordered randomly
-      case CorrelationMode.PositiveCorrelation => (x: Edge[Int], y: Edge[Int]) => x.attr compareTo y.attr
-      case CorrelationMode.NegativeCorrelation => (x: Edge[Int], y: Edge[Int]) => y.attr compareTo x.attr
+      case CorrelationMode.PositiveCorrelation => (x: Edge[IntervalAndDegrees], y: Edge[IntervalAndDegrees]) => x.attr.degree compareTo y.attr.degree
+      case CorrelationMode.NegativeCorrelation => (x: Edge[IntervalAndDegrees], y: Edge[IntervalAndDegrees]) => y.attr.degree compareTo x.attr.degree
     }
   }
 
@@ -135,10 +142,10 @@ object UpdateDistributions {
     }
   }
 
-  private def getSortedUniformDistribution(low:Double, high:Double, numSamples:Int):List[Int] =
-    Uniform(low,high).sample(numSamples).map(_.toInt).toList.sorted
+  private def getSortedUniformDistribution(low:Double, high:Double, numSamples:Int):List[Long] =
+    Uniform(low,high).sample(numSamples).map(_.toLong).toList.sorted
 
-  def generateTSVs(graph: Graph[Int, Int]): RDD[LogTSV] = {
+  def generateTSVs(graph: Graph[Int, IntervalAndUpdateCount]): RDD[LogTSV] = {
     val (vertices, edges) = (graph.vertices, graph.edges)
     val vertexIdWithTimestamp = vertices.map(vertex => {
       val (id, numberOfUpdates) = vertex
@@ -152,40 +159,48 @@ object UpdateDistributions {
 
     // Has to be rewritten as Edge[Int] should be Edge[(Int, Timestamp)] from existing data
     val edgeIdWithTimestamp = edges.map(edge => {
-      ((edge.srcId, edge.dstId), getSortedUniformDistribution(0,1000, edge.attr))
+      val distribution = getSortedUniformDistribution(edge.attr.interval.start.getEpochSecond,edge.attr.interval.stop.getEpochSecond, edge.attr.count)
+      ((edge.srcId, edge.dstId),(edge.attr.interval, distribution))
     })
     val edgeLogs = edgeIdWithTimestamp.map(edge => {
-      val (ids, timestamps) = edge
-      (ids, timestamps.map(generateEdgeTSV(ids, _)))
+      val (ids, (interval,timestamps)) = edge
+      val startTSV = getCreateDeleteEdgeTSV(ids, interval.start, CREATE)
+      val endTSV = getCreateDeleteEdgeTSV(ids, interval.stop, DELETE)
+      (ids, List(startTSV) ++ timestamps.map(generateEdgeTSV(ids, _)) ++ List(endTSV))
     }).flatMap(_._2)
 
     (vertexLogs ++ edgeLogs).sortBy(_.timestamp)
   }
-  def generateEdgeTSV(srcIdAndDstId: (Long, Long), timestamp: Int) = {
+  def getCreateDeleteEdgeTSV(srcAndDstId:(Long,Long), timestamp:Instant, action: Action):LogTSV =  {
+    assert(action == CREATE || action == DELETE) // Im lazy
+    LogTSV(
+      timestamp = timestamp,
+      action = action,
+      objectType = EDGE.tupled(srcAndDstId),
+      attributes = if (action==CREATE) getRandomAttributes else HashMap.empty
+    )
+  }
+  def generateEdgeTSV(srcIdAndDstId: (Long, Long), timestamp: Long): LogTSV = {
     LogTSV(
       timestamp = Instant.ofEpochSecond(timestamp),
       action = UPDATE,
       objectType = EDGE.tupled(srcIdAndDstId),
-      attributes = getRandomAttributes()
+      attributes = getRandomAttributes
     )
   }
 
 
-  def generateVertexTSV(id: VertexId, timestamp: Int): LogTSV = {
+  def generateVertexTSV(id: VertexId, timestamp: Long): LogTSV = {
     LogTSV(
       timestamp = Instant.ofEpochSecond(timestamp),
       action = UPDATE,
       objectType = VERTEX(id),
-      attributes = getRandomAttributes()
+      attributes = getRandomAttributes
     )
 
   }
 
-  private def getRandomItem(items: List[String]) ={
-    val random = new Random()
-    items(random.nextInt(items.length))
-  }
-  def getRandomAttributes():Attributes = {
+  def getRandomAttributes:Attributes = {
     val faker = new Faker()
     HashMap[String,String](
       ("color", faker.color().name()),
@@ -204,9 +219,14 @@ object UpdateDistributions {
    * @param mu    Expected value
    * @param sigma Standard deviation
    */
-  def addLogNormalGraphUpdateDistribution[VD, ED: ClassTag](sc: SparkContext, graph: Graph[VD, ED], mu: Int = 100, sigma: Double = 2): Graph[Int, Int] = {
+  def addLogNormalGraphUpdateDistribution[VD](sc: SparkContext, graph: Graph[VD, TimeInterval], mu: Int = 100, sigma: Double = 2): Graph[Int, IntervalAndUpdateCount] = {
     val g1 = addVertexUpdateDistribution(sc, graph, CorrelationMode.PositiveCorrelation, LogNormalType(mu, sigma))
     addEdgeUpdateDistribution(sc, g1, CorrelationMode.PositiveCorrelation, LogNormalType(mu, sigma))
+  }
+
+  def getLogTSV[VD](sc:SparkContext, graph: Graph[VD, TimeInterval]): RDD[LogTSV] = {
+    val g = addLogNormalGraphUpdateDistribution(sc, graph)
+    generateTSVs(g)
   }
 
   /** Plot the distribution of the Int associated with vertices
@@ -231,7 +251,7 @@ object UpdateDistributions {
    * @param title    Title for the generated diagram
    * @param filename Filename for the diagram
    * @tparam VD Vertices can have any type */
-  def plotUpdateDistributionEdges[VD](graph: Graph[VD, Int], bins: Int = 100, title: String = "Here your dist", filename: String = "plot.png") = {
+  def plotUpdateDistributionEdges[VD](graph: Graph[VD, Int], bins: Int = 100, title: String = "Here your dist", filename: String = "plot.png"): Unit = {
     val figure = Figure()
     val plot = figure.subplot(0)
     val values = graph.edges.collect().map(x => x.attr.toDouble)
@@ -241,5 +261,3 @@ object UpdateDistributions {
   }
 
 }
-
-
