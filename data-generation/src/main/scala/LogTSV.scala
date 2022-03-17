@@ -4,7 +4,7 @@ import LTSV.Attributes
 import com.github.javafaker.Faker
 
 import java.time.{Instant, LocalDateTime, ZoneOffset}
-import scala.collection.immutable.HashMap
+import scala.collection.immutable
 import scala.util.Try
 import scala.util.Random.nextInt
 import scala.io.Source
@@ -20,30 +20,27 @@ object Action{
 }
 sealed abstract class Entity
 object Entity {
-  final case class VERTEX(objId:Long) extends Entity
-  final case class EDGE(srcId:Long, dstId:Long) extends Entity
+  final case class VERTEX(objId: Long) extends Entity
+  final case class EDGE(srcId: Long, dstId: Long) extends Entity
 }
 
-// TODO create EdgeLogTSV and VertexLogTSV
-// toEdgeLog(l:LogTSV): Option[EdgeLogTSV]
 /** LogTSV
  *
  * Everything is built around this case class
  * @param timestamp When did the log_entry happen?
  * @param action Type of action
- * @param objectId Id of the object
+ * @param entity The type of the object with id(s)
  * @param attributes List of (Key,Value) attributes relevant to the entry
  */
 case class LogTSV(
-                 sequentialId: Int,
                  timestamp : Instant,
                  action : Action,
-                 objectType: Entity,
+                 entity: Entity,
                  attributes: Attributes
                  )
 
-object LTSV {
 
+object LTSV {
   /** Random LogTSV instance
    *
    * Convenient for testing
@@ -55,50 +52,52 @@ object LTSV {
     LogTSV(
       timestamp = Instant.now(),
       action = actions(nextInt(actions.size)),
-      objectType = VERTEX(nextInt(10000)),
-      attributes = List(("champion",faker.leagueOfLegends().champion()),
+      entity = VERTEX(nextInt(10000)),
+      attributes = immutable.HashMap(
+        ("champion", faker.leagueOfLegends().champion()),
         ("friends", faker.friends().character()))
     )
-
-
-
   }
+
+  def stringToEntity(s: String): Option[Entity] = {
+    s.split(":").toList match {
+      case "VERTEX" :: id :: Nil => Some(VERTEX(id.toLong))
+      case "EDGE" :: srcId :: dstId :: Nil => Some(EDGE(srcId.toLong, dstId.toLong))
+      case _ => None
+    }
+  }
+
   // Type alias
-  type Attributes = HashMap[String, String]
+  type Attributes = immutable.HashMap[String, String]
 
   /** Serialize a single LogTSV
    *
    * @param logEntry The log entry
    * @return String representation of the LogTSV
    */
-  def serializeLTSV(logEntry:LogTSV ): String ={
-    val timestamp = LocalDateTime.ofInstant(logEntry.timestamp, ZoneOffset.UTC).toString +"Z"
+  def serializeLTSV(logEntry: LogTSV): String = {
+    val timestamp = LocalDateTime.ofInstant(logEntry.timestamp, ZoneOffset.UTC).toString + "Z"
     val action = logEntry.action match {
       case CREATE => "CREATE"
       case UPDATE => "UPDATE"
       case DELETE => "DELETE"
     }
-    val objectType = logEntry.objectType match {
-      case Entity.VERTEX(id) => "EDGE"
-      case Entity.EDGE(srcId, dstId) => "VERTEX"
+    val entity = logEntry.entity match {
+      case VERTEX(id) => s"VERTEX:$id"
+      case EDGE(srcId, dstId) => s"EDGE:$srcId:$dstId"
     }
-    val attributes = logEntry.objectType match {
-      case VERTEX(objId) => serializeAttributes(("objId",objId.toString)::logEntry.attributes)
-      case EDGE(srcId, dstId) => serializeAttributes(("srcId",srcId.toString)::("dstId",dstId.toString)::logEntry.attributes)
-    }
+    val attributes = serializeAttributes(logEntry.attributes)
 
-    List(timestamp, action, objectType, attributes)
+    List(timestamp, action, entity, attributes)
       .mkString("\t")
   }
 
-  def serializeList(entries: List[LogTSV]):String = entries.map(serializeLTSV).mkString("\n")
-  def deserializeList(entries: String):List[LogTSV] = entries.split("\n").flatMap(deserializeLTSV).toList
+  def serializeList(entries: List[LogTSV]): String = entries.map(serializeLTSV).mkString("\n")
+  def deserializeList(entries: String): List[LogTSV] = entries.split("\n").flatMap(deserializeLTSV).toList
 
   /**  Deserialize a single LogTSV
    *
-   * Check this shit out. Monadic error handling
-   *
-   * All the variables with s_ prefix return an Option type.
+   * All the variables with 'serialized' prefix return an Option type.
    * If any return a None the whole block returns a None.
    * If every one of the are parsed correctly it return Some(LogTsv)
    *
@@ -107,10 +106,10 @@ object LTSV {
    * @param logEntry String representation of a log entry
    * @return Possibly a LogTSV
    */
-  def deserializeLTSV(logEntry:String):Option[LogTSV] = {
+  def deserializeLTSV(logEntry: String): Option[LogTSV] = {
     // This line could fail, but its a hassle to make safe
     // Destructures the first three items, and 'attributes' is the tail
-    val timestamp::action::objectId::objectType::attributes : List[String]= logEntry.split('\t').toList
+    val timestamp::action::entity::attributes : List[String] = logEntry.split('\t').toList
     for {
       deserializedTimestamp <- Try {Instant.parse(timestamp)}.toOption
       deserializedAction <- action match {
@@ -119,14 +118,9 @@ object LTSV {
         case "DELETE" => Some(DELETE)
         case _ => None
       }
-      deserializedObjectId <- Try{objectId.toLong}.toOption
-      deserializedObjectType <- objectType match {
-        case "VERTEX" => Some(VERTEX)
-        case "EDGE" => Some(EDGE)
-        case _ => None
-      }
+      deserializedEntry <- stringToEntity(entity)
       deserializedAttributes <- deserializeAttributes(attributes)
-    } yield LogTSV(deserializedTimestamp, deserializedAction, deserializedObjectId,deserializedObjectType, deserializedAttributes)
+    } yield LogTSV(deserializedTimestamp, deserializedAction, deserializedEntry, deserializedAttributes)
   }
 
 
@@ -138,7 +132,7 @@ object LTSV {
    * @return String representation of the attributes
    *
    */
-  def serializeAttributes(attributes:Attributes): String = {
+  def serializeAttributes(attributes: Attributes): String = {
     val noTabsOrColon = (x:Char) => x != '\t' && x != ':'
     attributes.map(
       tup => s"${tup._1.filter(noTabsOrColon)}:${tup._2.filter(noTabsOrColon)}"
@@ -150,52 +144,31 @@ object LTSV {
    * @param attributes List of string representation of each attribute
    * @return Possibly a list of parsed attributes
    */
-  def deserializeAttributes(attributes: List[String]) : Option[Attributes] = {
-    val x = attributes
+  def deserializeAttributes(attributes: List[String]): Option[Attributes] = {
+    val attributeTuples = attributes
       .map(_.split(':').toList)
       .map {
         case key :: value :: Nil => Some(key, value)
         case _ => None
       }
-    if (x.forall(_.isDefined)){ // Did everything parse correctly?
-      Some(x.flatten)
+    if (attributeTuples.forall(_.isDefined)){ // Did everything parse correctly?
+      val immutableHashMap = immutable.HashMap[String, String](attributeTuples.flatten:_*)
+      Some(immutableHashMap)
     } else {
       None
     }
   }
-   def writeToFile(entries:List[LogTSV], filename:String="logs.tsv"):Unit = {
-     val pw = new java.io.PrintWriter("logs.tsv")
+
+   def writeToFile(entries: List[LogTSV], filename: String="logs.tsv"): Unit = {
+     val pw = new java.io.PrintWriter(filename)
      pw.write(serializeList(entries))
      pw.close()
    }
-  def readFromFile(filename:String="logs.tsv"):List[LogTSV] = {
+
+  def readFromFile(filename: String="logs.tsv"): List[LogTSV] = {
     val f = Source.fromFile(filename)
     val list = deserializeList(f.mkString)
     f.close()
     list
-  }
-
-  /** Home made testsuite
-   *
-   * TODO set up a TestSuite for scala
-   *
-   * Generates some random TSVs and makes sure that serializing and deserializing
-   * are inverse functions in relation to each other
-   *
-   */
-  def tests():Unit = {
-    for( _ <- 1 to 10){
-      val tsv = randomLTSV()
-      val s_tsv = serializeLTSV(tsv)
-      val d_tsv = deserializeLTSV(s_tsv).get
-      val s_d_tsv = serializeLTSV(d_tsv)
-      assert(d_tsv == tsv)
-      assert(s_d_tsv == s_tsv)
-    }
-    val x = for (_ <- 1 to 5) yield randomLTSV()
-    assert(deserializeList(serializeList(x.toList)) == x.toList)
-
-    writeToFile(x.toList, filename="testLogs.tsv")
-    assert(readFromFile(filename = "testLogs.tsv") == x.toList)
   }
 }
