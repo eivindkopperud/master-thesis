@@ -15,5 +15,7 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "3.2.11" % "test"
 )
 
+testOptions in Test += Tests.Argument(TestFrameworks.ScalaTest, "-oD")  // Display runtime for tests
+
 
 scalaVersion := "2.12.15"
