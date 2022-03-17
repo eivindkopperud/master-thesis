@@ -81,7 +81,7 @@ object UpdateDistributions {
    * @param distribution Some probability distribution
    * @return */
   def addEdgeUpdateDistribution[VD](sc: SparkContext, graph: Graph[Int, TimeInterval], mode: CorrelationMode, distribution: DistributionType): Graph[Int, IntervalAndUpdateCount] = {
-    //The HashMap is never updated?
+
     val vertexUpdateHashMap = graph
       .vertices
       .collect()
@@ -145,7 +145,7 @@ object UpdateDistributions {
   private def getSortedUniformDistribution(low:Double, high:Double, numSamples:Int):List[Long] =
     Uniform(low,high).sample(numSamples).map(_.toLong).toList.sorted
 
-  def generateTSVs(graph: Graph[Int, IntervalAndUpdateCount]): RDD[LogTSV] = {
+  def generateLogs(graph: Graph[Int, IntervalAndUpdateCount]): RDD[LogTSV] = {
     val (vertices, edges) = (graph.vertices, graph.edges)
     val vertexIdWithTimestamp = vertices.map(vertex => {
       val (id, numberOfUpdates) = vertex
@@ -226,7 +226,7 @@ object UpdateDistributions {
 
   def getLogTSV[VD:ClassTag](sc:SparkContext, graph: Graph[VD, TimeInterval]): RDD[LogTSV] = {
     val g = addLogNormalGraphUpdateDistribution(sc, graph)
-    generateTSVs(g)
+    generateLogs(g)
   }
 
   /** Plot the distribution of the Int associated with vertices
