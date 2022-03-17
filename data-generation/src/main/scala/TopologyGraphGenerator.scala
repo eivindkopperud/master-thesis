@@ -34,9 +34,11 @@ object TopologyGraphGenerator {
     val edges: RDD[Edge[TimeInterval]] = leadDf
       .select("from", "to", "from time", "to time")
       .rdd.map(
-      row =>
+      row => {
         Edge(row.getAs[String]("from").toLong, row.getAs[String]("to").toLong,
-          TimeInterval(Instant.ofEpochSecond(row.getAs[Long]("from time")), Instant.ofEpochSecond(row.getAs[Long]("to time")))))
+          TimeInterval(Instant.ofEpochSecond(row.getAs[String]("from time").toLong), Instant.ofEpochSecond(row.getAs[String]("to time").toLong)))
+      }
+    )
 
     Graph(vertices, edges)
   }

@@ -176,7 +176,7 @@ object UpdateDistributions {
     LogTSV(
       timestamp = timestamp,
       action = action,
-      objectType = EDGE.tupled(srcAndDstId),
+      entity = EDGE.tupled(srcAndDstId),
       attributes = if (action==CREATE) getRandomAttributes else HashMap.empty
     )
   }
@@ -184,7 +184,7 @@ object UpdateDistributions {
     LogTSV(
       timestamp = Instant.ofEpochSecond(timestamp),
       action = UPDATE,
-      objectType = EDGE.tupled(srcIdAndDstId),
+      entity = EDGE.tupled(srcIdAndDstId),
       attributes = getRandomAttributes
     )
   }
@@ -194,7 +194,7 @@ object UpdateDistributions {
     LogTSV(
       timestamp = Instant.ofEpochSecond(timestamp),
       action = UPDATE,
-      objectType = VERTEX(id),
+      entity = VERTEX(id),
       attributes = getRandomAttributes
     )
 
@@ -219,12 +219,12 @@ object UpdateDistributions {
    * @param mu    Expected value
    * @param sigma Standard deviation
    */
-  def addLogNormalGraphUpdateDistribution[VD](sc: SparkContext, graph: Graph[VD, TimeInterval], mu: Int = 100, sigma: Double = 2): Graph[Int, IntervalAndUpdateCount] = {
+  def addLogNormalGraphUpdateDistribution[VD:ClassTag](sc: SparkContext, graph: Graph[VD, TimeInterval], mu: Int = 100, sigma: Double = 2): Graph[Int, IntervalAndUpdateCount] = {
     val g1 = addVertexUpdateDistribution(sc, graph, CorrelationMode.PositiveCorrelation, LogNormalType(mu, sigma))
     addEdgeUpdateDistribution(sc, g1, CorrelationMode.PositiveCorrelation, LogNormalType(mu, sigma))
   }
 
-  def getLogTSV[VD](sc:SparkContext, graph: Graph[VD, TimeInterval]): RDD[LogTSV] = {
+  def getLogTSV[VD:ClassTag](sc:SparkContext, graph: Graph[VD, TimeInterval]): RDD[LogTSV] = {
     val g = addLogNormalGraphUpdateDistribution(sc, graph)
     generateTSVs(g)
   }
