@@ -1,13 +1,15 @@
-import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.SparkConf
+import org.apache.spark.sql.SparkSession
 
 object SparkConfiguration {
 
-  def getSparkContext: SparkContext = {
+  def getSparkSession: SparkSession = {
     val conf = new SparkConf()
       .setAppName("data-generation")
-      .setMaster("local")
+      .setMaster("local[2]")
       .set("spark.ui.enabled", "false")
-    new SparkContext(conf)
+      .set("spark.driver.memory", "2g")
+    SparkSession.builder.config(conf).getOrCreate()
   }
 
 

@@ -4,6 +4,10 @@ import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{col, lag, last, when}
 import org.apache.spark.sql.{SparkSession, functions}
 
+import java.time.Instant
+
+final case class TimeInterval(start:Instant, stop:Instant)
+
 object TopologyGraphGenerator {
 
   def generateGraph(
@@ -11,7 +15,7 @@ object TopologyGraphGenerator {
                      threshold: BigDecimal,
                      filePath: String="src/main/resources/fb-messages.csv",
                      delimiter: String=","
-                   ):Graph[Long, (BigDecimal, BigDecimal)] = {
+                   ):Graph[Long, TimeInterval] = {
     val window = Window.orderBy("from", "to", "time")
     val df = spark.read.option("delimiter", delimiter).csv(filePath)
       .toDF("from", "to", "time")
@@ -27,12 +31,14 @@ object TopologyGraphGenerator {
       .rdd.map(row => row.getAs[String]("from").toLong)
       .map(long => (long, long))
 
-    val edges: RDD[Edge[(BigDecimal,BigDecimal)]] = leadDf
+    val edges: RDD[Edge[TimeInterval]] = leadDf
       .select("from", "to", "from time", "to time")
       .rdd.map(
-      row =>
+      row => {
         Edge(row.getAs[String]("from").toLong, row.getAs[String]("to").toLong,
-          (row.getAs[BigDecimal]("from time"), row.getAs[BigDecimal]("to time"))))
+          TimeInterval(Instant.ofEpochSecond(row.getAs[String]("from time").toLong), Instant.ofEpochSecond(row.getAs[String]("to time").toLong)))
+      }
+    )
 
     Graph(vertices, edges)
   }
