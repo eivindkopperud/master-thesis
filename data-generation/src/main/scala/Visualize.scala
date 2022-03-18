@@ -7,7 +7,7 @@ object Visualize {
 
   /** Converts a Graph to .gexf format and writes it to file
    *
-   * @param g Graph to be visualized
+   * @param g        Graph to be visualized
    * @param filename Filename to be written to
    * @tparam VD Vertex type
    * @tparam ED Edge type
@@ -44,10 +44,11 @@ object Visualize {
     val v = g.vertices.collect.map(_._1)
     val file = new File("graph.html")
     val bw = new BufferedWriter(new FileWriter(file))
-    val x = """
+    val x =
+      """
 <html>
 <div id='a""" + u +
-      """' style='width:960px; height:500px'></div>
+        """' style='width:960px; height:500px'></div>
 <style>
   .node circle { fill: gray; }
   .node text { font: 10px sans-serif;
@@ -61,14 +62,14 @@ object Visualize {
   var width = 960;
   height = 500;
   var svg = d3.select("#a""" + u +
-      """").append("svg").attr("width", width).attr("height", height);
+        """").append("svg").attr("width", width).attr("height", height);
   var nodes = [""" + v.map("{id:" + _ + "}").mkString(",") +
-      """];
+        """];
   var links = [""" + g.edges.collect.map(
-      e => "{source:nodes[" + v.indexWhere(_ == e.srcId) +
-        "],target:nodes[" +
-        v.indexWhere(_ == e.dstId) + "]}").mkString(",") +
-      """];
+        e => "{source:nodes[" + v.indexWhere(_ == e.srcId) +
+          "],target:nodes[" +
+          v.indexWhere(_ == e.dstId) + "]}").mkString(",") +
+        """];
   var link = svg.selectAll(".link").data(links);
   link.enter().insert("line", ".node").attr("class", "link");
   var node = svg.selectAll(".node").data(nodes);

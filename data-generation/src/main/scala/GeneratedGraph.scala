@@ -1,22 +1,22 @@
+import com.github.javafaker.Faker
 import org.apache.spark.SparkContext
 import org.apache.spark.graphx.util.GraphGenerators
 import org.apache.spark.graphx.{EdgeRDD, Graph, VertexRDD}
-import com.github.javafaker.Faker
 
 object GeneratedGraph {
 
   type V = VertexRDD[String]
   type E = EdgeRDD[String]
 
-  def genGridGraph[A,B](sc: SparkContext): Graph[(Int, Int), Double] =
-    GraphGenerators.gridGraph(sc, 5 , 5)
+  def genGridGraph[A, B](sc: SparkContext): Graph[(Int, Int), Double] =
+    GraphGenerators.gridGraph(sc, 5, 5)
 
-  def genLogNormalGraph(sc: SparkContext, nvert:Int=5, nedge:Int=5): Graph[String, String] =
+  def genLogNormalGraph(sc: SparkContext, nvert: Int = 5, nedge: Int = 5): Graph[String, String] =
     GraphGenerators.logNormalGraph(sc, nvert, nedge)
       .mapVertices((id, num) => getRandomName)
       .mapEdges(edge => getRandomRelation)
 
-  def genRMATGraph(sc:SparkContext) : Graph[Int, Int] =
+  def genRMATGraph(sc: SparkContext): Graph[Int, Int] =
     GraphGenerators.rmatGraph(sc, 5, 10)
 
   def getRandomName: String = new Faker().leagueOfLegends().champion()

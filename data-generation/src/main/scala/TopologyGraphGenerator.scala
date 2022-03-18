@@ -13,9 +13,9 @@ object TopologyGraphGenerator {
   def generateGraph(
                      spark: SparkSession,
                      threshold: BigDecimal,
-                     filePath: String="src/main/resources/fb-messages.csv",
-                     delimiter: String=","
-                   ):Graph[Long, TimeInterval] = {
+                     filePath: String = "src/main/resources/fb-messages.csv",
+                     delimiter: String = ","
+                   ): Graph[Long, (BigDecimal, BigDecimal)] = {
     val window = Window.orderBy("from", "to", "time")
     val df = spark.read.option("delimiter", delimiter).csv(filePath)
       .toDF("from", "to", "time")

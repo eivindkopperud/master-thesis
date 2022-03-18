@@ -3,7 +3,7 @@ import org.apache.spark.rdd.RDD
 
 object CsvUtils {
   /*
-  [String] -> [TemporalEvent]
+  [String] -> [thesis.TemporalEvent]
   Map csv to case classes
    */
   def textFileToRDDCaseClass(file: String, sc: SparkContext): RDD[TemporalEvent[BigDecimal]] =

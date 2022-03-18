@@ -54,6 +54,7 @@ object GraphProperties {
   /** ToString for GraphStats
    *
    * But I haven't learned idiomatic Scala yet. Think this should be done differently
+   *
    * @param g GraphStats object
    * @return Table format as a string
    */
@@ -69,6 +70,7 @@ object GraphProperties {
    *
    * TODO find a better datastructure, not very extensible right now
    * TODO Add more stats (PowerLaw exponent etc)
+   *
    * @param graph Graph
    * @tparam VD VertexType
    * @tparam ED EdgeType
@@ -78,7 +80,7 @@ object GraphProperties {
       graph.ops.numVertices,
       graph.ops.numEdges,
       graph.ops.outDegrees.values.sum() / graph.ops.numEdges)
-   println(graphStatsToString(graphStats))
+    println(graphStatsToString(graphStats))
   }
 
 
