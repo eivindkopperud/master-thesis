@@ -87,7 +87,7 @@ object UpdateDistributions {
       .collect()
       .toMap
 
-    val EdgesWithDegree = graph
+    val edgesWithDegree = graph
       .mapEdges(edge => IntervalAndDegrees(edge.attr,getVertexUpdateSum(edge, vertexUpdateHashMap)))
       .edges
       .collect()
@@ -101,7 +101,7 @@ object UpdateDistributions {
       .map(edge => edge.attr)
 
     val edgesWithUpdateCount = sc.parallelize(
-      EdgesWithDegree
+      edgesWithDegree
         .zip(numberOfUpdates)
         .map(edgeAndCount =>
           Edge(edgeAndCount._1.srcId, edgeAndCount._1.dstId, IntervalAndUpdateCount(edgeAndCount._1.attr.interval, edgeAndCount._2)))
