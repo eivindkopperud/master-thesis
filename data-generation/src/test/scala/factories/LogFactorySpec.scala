@@ -1,7 +1,7 @@
 package factories
 
 import org.scalatest.flatspec.AnyFlatSpec
-import Action.{CREATE, UPDATE}
+import thesis.Action.{CREATE, UPDATE}
 
 class LogFactorySpec extends AnyFlatSpec {
 

@@ -1,6 +1,10 @@
 package factories
 
 import com.github.javafaker.Faker
+import thesis.Action.{CREATE, UPDATE, DELETE}
+import thesis.Entity.VERTEX
+import thesis.LogTSV
+import utils.TimeUtils
 
 import java.time.Instant
 import scala.collection.immutable

@@ -62,7 +62,7 @@ object SnapshotIntervalType {
 object SnapshotDeltaObject {
   def create[VD,ED](logs: RDD[LogTSV], snapType: SnapshotIntervalType): SnapshotDelta = {
     snapType match {
-      //case thesis.SnapshotIntervalType.Time(duration) => snapShotTime(logs, duration)
+      //case SnapshotIntervalType.Time(duration) => snapShotTime(logs, duration)
       case SnapshotIntervalType.Count(numberOfActions) => createSnapshotCountModel(logs, numberOfActions)
     }
   }
@@ -122,7 +122,7 @@ object SnapshotDeltaObject {
       case EDGE(srcId, dstId) => Some((srcId, dstId), log)
     })
 
-    // Group by vertex id and merge
+    // Group by edge id and merge
     edgeIdWithEdgeActions.groupByKey()
       .map(edgeWithActions => (edgeWithActions._1, mergeLogTSVs(edgeWithActions._2)))
   }
@@ -176,7 +176,7 @@ object SnapshotDeltaObject {
         nextLog.copy(attributes=rightWayMergeHashMap(prevLog.attributes, nextLog.attributes)) // Could be either l1 or l2 that is copied
       case (CREATE, UPDATE) =>
         prevLog.copy(attributes=rightWayMergeHashMap(nextLog.attributes, prevLog.attributes))
-      case (_,_) => assert(1==2); prevLog; // Cases that should not happen. We assume the thesis.LogTSV are consistent and makes sense
+      case (_, _) => assert(1 == 2); prevLog; // Cases that should not happen. We assume the LogTSVs are consistent and makes sense
       // example (DELETE, DELETE), (DELETE, UPDATE) // These do not make sense
     }
   }

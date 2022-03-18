@@ -1,5 +1,4 @@
 import factories.LogFactory
-import org.apache.spark.rdd.RDD
 import org.scalatest.flatspec.AnyFlatSpec
 import thesis.Action.{UPDATE, CREATE}
 import thesis.SnapshotDeltaObject.getSquashedActionsByVertexId

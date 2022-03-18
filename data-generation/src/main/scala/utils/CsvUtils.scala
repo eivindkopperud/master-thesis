@@ -2,10 +2,11 @@ package utils
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
+import thesis.TemporalEvent
 
 object CsvUtils {
   /*
-  [String] -> [thesis.thesis.TemporalEvent]
+  [String] -> [TemporalEvent]
   Map csv to case classes
    */
   def textFileToRDDCaseClass(file: String, sc: SparkContext): RDD[TemporalEvent[BigDecimal]] =
