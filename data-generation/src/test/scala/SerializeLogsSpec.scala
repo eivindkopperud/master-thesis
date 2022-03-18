@@ -1,10 +1,11 @@
-import LTSV.{deserializeLTSV, deserializeList, randomLTSV, serializeLTSV, serializeList}
+import factories.LogFactory
+import thesis.LTSV.{deserializeLTSV, deserializeList, serializeLTSV, serializeList}
 import org.scalatest.flatspec.AnyFlatSpec
 
 class SerializeLogsSpec extends AnyFlatSpec {
 
   "Logs" can "be serialized and then deserialized" in {
-    val log = randomLTSV()
+    val log = LogFactory().getOne
 
     val serializedTSV = serializeLTSV(log)
     val deserializedTSV = deserializeLTSV(serializedTSV).get
@@ -12,7 +13,7 @@ class SerializeLogsSpec extends AnyFlatSpec {
   }
 
   it can "be serialized and then deserialized and then serialized" in {
-    val log = randomLTSV()
+    val log = LogFactory().getOne
 
     val serializedLog = serializeLTSV(log)
     val deserializedLog = deserializeLTSV(serializedLog).get
@@ -22,7 +23,7 @@ class SerializeLogsSpec extends AnyFlatSpec {
   }
 
   it can "be (de)serialized in list form" in {
-    val logs = for (_ <- 1 to 5) yield randomLTSV()
+    val logs = LogFactory().buildSingleSequence(5, 1)
 
     assert(deserializeList(serializeList(logs.toList)) == logs.toList)
   }
