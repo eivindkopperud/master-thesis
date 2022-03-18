@@ -1,9 +1,11 @@
-import Action.{CREATE, DELETE, UPDATE}
-import Entity.{EDGE, VERTEX}
-import LTSV.Attributes
+package thesis
+
 import org.apache.spark.graphx._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.rdd.RDD.rddToOrderedRDDFunctions
+import thesis.Action.{CREATE, DELETE, UPDATE}
+import thesis.Entity.{EDGE, VERTEX}
+import thesis.LTSV.Attributes
 
 import scala.collection.mutable.MutableList
 
@@ -114,16 +116,15 @@ object SnapshotDeltaObject {
 
   // We are making the assumption that there can only be one edge between two nodes. We might have to create a surrogate key
   def getSquashedActionsByEdgeId(logs: RDD[LogTSV]): RDD[((Long, Long), LogTSV)] = {
-    // Get all ids of edges in the log interval
-    val edgeIds = logs.flatMap(getEdgeIds)
+    // Filter out vertex actions
+    val edgeIdWithEdgeActions = logs.flatMap(log => log.entity match {
+      case VERTEX(_) => None
+      case EDGE(srcId, dstId) => Some((srcId, dstId), log)
+    })
 
-    // Squash all actions on each edge to one single action
-    val edgesWithAction = edgeIds.map(edgeIDs => (edgeIDs, logs.filter(log => log.entity match {
-      case VERTEX(objId) => (edgeIDs._1 == objId || edgeIDs._2 == objId) && log.action == DELETE // Vertex DELETES means that the edge is deleted as well
-      case EDGE(srcId, dstId) => edgeIDs._1 == srcId && edgeIDs._2 == dstId
-    })))
-      .map(edgeWithAction => (edgeWithAction._1, mergeLogTSVs(edgeWithAction._2)))
-    edgesWithAction
+    // Group by edge id and merge
+    edgeIdWithEdgeActions.groupByKey()
+      .map(edgeWithActions => (edgeWithActions._1, mergeLogTSVs(edgeWithActions._2)))
   }
 
   def applyVertexLogsToSnapshot(snapshot: Graph[LTSV.Attributes, LTSV.Attributes], logs: RDD[LogTSV]): RDD[(VertexId, Attributes)] = {
@@ -154,19 +155,18 @@ object SnapshotDeltaObject {
   }
 
   def getSquashedActionsByVertexId(logs: RDD[LogTSV]): RDD[(Long, LogTSV)] = {
-    // Get all ids of vertices in the log interval
-    val vertexIds = logs.flatMap(getVertexIds)
+    // Filter out edge actions
+    val vertexIdWithVertexActions = logs.flatMap(log => log.entity match {
+      case VERTEX(objId) => Some(objId, log)
+      case EDGE(_, _) => None
+    })
 
-    // Squash all actions on each vertex to one single action
-    val verticesWithAction = vertexIds.map(id => (id, logs.filter(log => log.entity match {
-      case VERTEX(objId) => id == objId
-      case EDGE(_, _) => false
-    })))
+    // Group by vertex id and merge
+    vertexIdWithVertexActions.groupByKey()
       .map(vertexWithActions => (vertexWithActions._1, mergeLogTSVs(vertexWithActions._2)))
-    verticesWithAction
   }
 
-  def mergeLogTSVs(logs:RDD[LogTSV]):LogTSV = logs.reduce(mergeLogTSV)
+  def mergeLogTSVs(logs: Iterable[LogTSV]): LogTSV = logs.reduce(mergeLogTSV)
 
   def mergeLogTSV(prevLog: LogTSV, nextLog: LogTSV) : LogTSV= {
     (prevLog.action, nextLog.action) match {
@@ -176,7 +176,7 @@ object SnapshotDeltaObject {
         nextLog.copy(attributes=rightWayMergeHashMap(prevLog.attributes, nextLog.attributes)) // Could be either l1 or l2 that is copied
       case (CREATE, UPDATE) =>
         prevLog.copy(attributes=rightWayMergeHashMap(nextLog.attributes, prevLog.attributes))
-      case (_,_) => assert(1==2); prevLog; // Cases that should not happen. We assume the LogTSV are consistent and makes sense
+      case (_, _) => assert(1 == 2); prevLog; // Cases that should not happen. We assume the LogTSVs are consistent and makes sense
       // example (DELETE, DELETE), (DELETE, UPDATE) // These do not make sense
     }
   }

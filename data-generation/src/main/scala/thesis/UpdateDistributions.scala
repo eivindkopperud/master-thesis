@@ -1,18 +1,15 @@
-import Action.{CREATE, UPDATE,DELETE}
+package thesis
+
+import Action.{CREATE, DELETE}
 import DistributionType.LogNormalType
-import Entity.{EDGE, VERTEX}
-import LTSV.Attributes
+import factories.LogFactory
+
 import breeze.plot.{Figure, hist}
 import breeze.stats.distributions.{Gaussian, LogNormal, Uniform}
-import com.github.javafaker.Faker
 import org.apache.spark.SparkContext
 import org.apache.spark.graphx.{Edge, Graph, VertexId, VertexRDD}
 import org.apache.spark.rdd.RDD
-
-import java.time.Instant
-import scala.collection.immutable.HashMap
 import scala.reflect.ClassTag
-import scala.util.Random
 
 sealed abstract class CorrelationMode
 
@@ -154,7 +151,7 @@ object UpdateDistributions {
     })
     val vertexLogs = vertexIdWithTimestamp.map(vertex => {
       val (id, timestamps) = vertex
-      (id, timestamps.map(generateVertexTSV(id, _)))
+      (id, timestamps.map(LogFactory().generateVertexTSV(id, _)))
     }).flatMap(_._2)
 
     // Has to be rewritten as Edge[Int] should be Edge[(Int, Timestamp)] from existing data
@@ -164,50 +161,14 @@ object UpdateDistributions {
     })
     val edgeLogs = edgeIdWithTimestamp.map(edge => {
       val (ids, (interval,timestamps)) = edge
-      val startTSV = getCreateDeleteEdgeTSV(ids, interval.start, CREATE)
-      val endTSV = getCreateDeleteEdgeTSV(ids, interval.stop, DELETE)
-      (ids, List(startTSV) ++ timestamps.map(generateEdgeTSV(ids, _)) ++ List(endTSV))
+      val startTSV = LogFactory().getCreateDeleteEdgeTSV(ids, interval.start, CREATE)
+      val endTSV = LogFactory().getCreateDeleteEdgeTSV(ids, interval.stop, DELETE)
+      (ids, List(startTSV) ++ timestamps.map(LogFactory().generateEdgeTSV(ids, _)) ++ List(endTSV))
     }).flatMap(_._2)
 
     (vertexLogs ++ edgeLogs).sortBy(_.timestamp)
   }
-  def getCreateDeleteEdgeTSV(srcAndDstId:(Long,Long), timestamp:Instant, action: Action):LogTSV =  {
-    assert(action == CREATE || action == DELETE) // Im lazy
-    LogTSV(
-      timestamp = timestamp,
-      action = action,
-      entity = EDGE.tupled(srcAndDstId),
-      attributes = if (action==CREATE) getRandomAttributes else HashMap.empty
-    )
-  }
-  def generateEdgeTSV(srcIdAndDstId: (Long, Long), timestamp: Long): LogTSV = {
-    LogTSV(
-      timestamp = Instant.ofEpochSecond(timestamp),
-      action = UPDATE,
-      entity = EDGE.tupled(srcIdAndDstId),
-      attributes = getRandomAttributes
-    )
-  }
 
-
-  def generateVertexTSV(id: VertexId, timestamp: Long): LogTSV = {
-    LogTSV(
-      timestamp = Instant.ofEpochSecond(timestamp),
-      action = UPDATE,
-      entity = VERTEX(id),
-      attributes = getRandomAttributes
-    )
-
-  }
-
-  def getRandomAttributes:Attributes = {
-    val faker = new Faker()
-    HashMap[String,String](
-      ("color", faker.color().name()),
-      ("animal", faker.animal().name()),
-      ("size", new Random().nextInt(10000).toString)
-    )
-  }
 
 
   /** Add log normal distributed weights as the property for vertices and edges

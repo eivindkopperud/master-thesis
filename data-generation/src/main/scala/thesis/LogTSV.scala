@@ -1,13 +1,12 @@
+package thesis
+
 import Action.{CREATE, DELETE, UPDATE}
 import Entity.{EDGE, VERTEX}
 import LTSV.Attributes
-import com.github.javafaker.Faker
-
 import java.time.{Instant, LocalDateTime, ZoneOffset}
 import scala.collection.immutable
-import scala.util.Try
-import scala.util.Random.nextInt
 import scala.io.Source
+import scala.util.Try
 
 /** Action Enum
  *
@@ -41,24 +40,6 @@ case class LogTSV(
 
 
 object LTSV {
-  /** Random LogTSV instance
-   *
-   * Convenient for testing
-   * @return An instance of LogTSV
-   */
-  def randomLTSV():LogTSV = {
-    val actions = List(CREATE, UPDATE, DELETE)
-    val faker = new Faker()
-    LogTSV(
-      timestamp = Instant.now(),
-      action = actions(nextInt(actions.size)),
-      entity = VERTEX(nextInt(10000)),
-      attributes = immutable.HashMap(
-        ("champion", faker.leagueOfLegends().champion()),
-        ("friends", faker.friends().character()))
-    )
-  }
-
   def stringToEntity(s: String): Option[Entity] = {
     s.split(":").toList match {
       case "VERTEX" :: id :: Nil => Some(VERTEX(id.toLong))

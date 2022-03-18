@@ -1,5 +1,8 @@
+package utils
+
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
+import thesis.TemporalEvent
 
 object CsvUtils {
   /*
