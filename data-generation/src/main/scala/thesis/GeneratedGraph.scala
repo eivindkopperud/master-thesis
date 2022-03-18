@@ -1,3 +1,5 @@
+package thesis
+
 import com.github.javafaker.Faker
 import org.apache.spark.SparkContext
 import org.apache.spark.graphx.util.GraphGenerators

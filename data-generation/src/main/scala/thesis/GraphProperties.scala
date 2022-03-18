@@ -1,3 +1,5 @@
+package thesis
+
 import breeze.linalg.linspace
 import breeze.plot.{Figure, plot}
 import org.apache.spark.graphx.Graph

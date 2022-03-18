@@ -1,7 +1,9 @@
+package thesis
 import Action.{CREATE, UPDATE,DELETE}
 import DistributionType.LogNormalType
 import Entity.{EDGE, VERTEX}
 import LTSV.Attributes
+
 import breeze.plot.{Figure, hist}
 import breeze.stats.distributions.{Gaussian, LogNormal, Uniform}
 import com.github.javafaker.Faker

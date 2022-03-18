@@ -1,3 +1,5 @@
+package utils
+
 import breeze.stats.distributions.Uniform
 
 import java.time.Instant

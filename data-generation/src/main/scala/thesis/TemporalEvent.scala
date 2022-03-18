@@ -1,3 +1,5 @@
+package thesis
+
 case class TemporalEvent[A](
                              from: Long,
                              to: Long,

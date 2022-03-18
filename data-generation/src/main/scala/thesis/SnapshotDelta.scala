@@ -1,9 +1,11 @@
-import Action.{CREATE, DELETE, UPDATE}
-import Entity.{EDGE, VERTEX}
-import LTSV.Attributes
+package thesis
+
 import org.apache.spark.graphx._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.rdd.RDD.rddToOrderedRDDFunctions
+import thesis.Action.{CREATE, DELETE, UPDATE}
+import thesis.Entity.{EDGE, VERTEX}
+import thesis.LTSV.Attributes
 
 import scala.collection.mutable.MutableList
 
@@ -60,7 +62,7 @@ object SnapshotIntervalType {
 object SnapshotDeltaObject {
   def create[VD,ED](logs: RDD[LogTSV], snapType: SnapshotIntervalType): SnapshotDelta = {
     snapType match {
-      //case SnapshotIntervalType.Time(duration) => snapShotTime(logs, duration)
+      //case thesis.SnapshotIntervalType.Time(duration) => snapShotTime(logs, duration)
       case SnapshotIntervalType.Count(numberOfActions) => createSnapshotCountModel(logs, numberOfActions)
     }
   }
@@ -174,7 +176,7 @@ object SnapshotDeltaObject {
         nextLog.copy(attributes=rightWayMergeHashMap(prevLog.attributes, nextLog.attributes)) // Could be either l1 or l2 that is copied
       case (CREATE, UPDATE) =>
         prevLog.copy(attributes=rightWayMergeHashMap(nextLog.attributes, prevLog.attributes))
-      case (_,_) => assert(1==2); prevLog; // Cases that should not happen. We assume the LogTSV are consistent and makes sense
+      case (_,_) => assert(1==2); prevLog; // Cases that should not happen. We assume the thesis.LogTSV are consistent and makes sense
       // example (DELETE, DELETE), (DELETE, UPDATE) // These do not make sense
     }
   }

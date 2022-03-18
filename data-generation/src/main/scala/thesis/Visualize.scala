@@ -1,3 +1,5 @@
+package thesis
+
 import org.apache.spark.graphx.{Edge, Graph, VertexId}
 
 import java.io.{BufferedWriter, File, FileWriter}

@@ -1,13 +1,14 @@
+package thesis
+
 import Action.{CREATE, DELETE, UPDATE}
 import Entity.{EDGE, VERTEX}
 import LTSV.Attributes
-
 import java.time.{Instant, LocalDateTime, ZoneOffset}
 import scala.collection.immutable
 import scala.io.Source
 import scala.util.Try
 
-/** Action Enum
+/** thesis.Action Enum
  *
  */
 sealed abstract class Action
@@ -22,7 +23,7 @@ object Entity {
   final case class EDGE(srcId: Long, dstId: Long) extends Entity
 }
 
-/** LogTSV
+/** thesis.LogTSV
  *
  * Everything is built around this case class
  * @param timestamp When did the log_entry happen?
@@ -50,10 +51,10 @@ object LTSV {
   // Type alias
   type Attributes = immutable.HashMap[String, String]
 
-  /** Serialize a single LogTSV
+  /** Serialize a single thesis.LogTSV
    *
    * @param logEntry The log entry
-   * @return String representation of the LogTSV
+   * @return String representation of the thesis.LogTSV
    */
   def serializeLTSV(logEntry: LogTSV): String = {
     val timestamp = LocalDateTime.ofInstant(logEntry.timestamp, ZoneOffset.UTC).toString + "Z"
@@ -75,7 +76,7 @@ object LTSV {
   def serializeList(entries: List[LogTSV]): String = entries.map(serializeLTSV).mkString("\n")
   def deserializeList(entries: String): List[LogTSV] = entries.split("\n").flatMap(deserializeLTSV).toList
 
-  /**  Deserialize a single LogTSV
+  /**  Deserialize a single thesis.LogTSV
    *
    * All the variables with 'serialized' prefix return an Option type.
    * If any return a None the whole block returns a None.
@@ -84,7 +85,7 @@ object LTSV {
    * TODO Rewrite this into Either-type so that information on what is going wrong isn't lost
    *
    * @param logEntry String representation of a log entry
-   * @return Possibly a LogTSV
+   * @return Possibly a thesis.LogTSV
    */
   def deserializeLTSV(logEntry: String): Option[LogTSV] = {
     // This line could fail, but its a hassle to make safe
