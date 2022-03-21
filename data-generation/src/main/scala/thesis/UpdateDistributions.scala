@@ -7,8 +7,9 @@ import org.apache.spark.SparkContext
 import org.apache.spark.graphx.{Edge, Graph, VertexId, VertexRDD}
 import org.apache.spark.rdd.RDD
 import thesis.Action.{CREATE, DELETE}
-import thesis.DistributionType.LogNormalType
+import thesis.DistributionType.{LogNormalType, UniformType}
 
+import java.nio.file.{Files, Paths}
 import scala.reflect.ClassTag
 
 sealed abstract class CorrelationMode
@@ -67,7 +68,7 @@ object UpdateDistributions {
    * @param mode Indicates the mode of which the nodes are ordered by
    * @return Sorted RDD
    * */
-  private def sortVerticesByMode(vertices: VertexRDD[Int], mode: CorrelationMode): RDD[(VertexId, Int)] = {
+  def sortVerticesByMode(vertices: VertexRDD[Int], mode: CorrelationMode): RDD[(VertexId, Int)] = {
     mode match {
       case CorrelationMode.Uniform => vertices.sortBy(_.hashCode())
       case CorrelationMode.PositiveCorrelation => vertices.sortBy(_._2, ascending = true)
@@ -172,7 +173,7 @@ object UpdateDistributions {
       (ids, List(startTSV) ++ timestamps.map(LogFactory().generateEdgeTSV(ids, _)) ++ List(endTSV))
     }).flatMap(_._2)
 
-    (vertexLogs ++ edgeLogs).sortBy(_.timestamp)
+    (vertexLogs ++ edgeLogs).sortBy(_.timestamp) // Sorting is expensive, but I think it is needed
   }
 
 
@@ -190,10 +191,31 @@ object UpdateDistributions {
     addEdgeUpdateDistribution(sc, g1, CorrelationMode.PositiveCorrelation, LogNormalType(mu, sigma))
   }
 
-  def getLogTSV[VD: ClassTag](sc: SparkContext, graph: Graph[VD, TimeInterval]): RDD[LogTSV] = {
-    val g = addLogNormalGraphUpdateDistribution(sc, graph)
+  def addGraphUpdateDistribution[VD: ClassTag](sc: SparkContext, graph: Graph[VD, TimeInterval], mode: DistributionType = UniformType(0, 1000)): Graph[Int, IntervalAndUpdateCount] = {
+    val g1 = addVertexUpdateDistribution(sc, graph, CorrelationMode.PositiveCorrelation, mode)
+    addEdgeUpdateDistribution(sc, g1, CorrelationMode.PositiveCorrelation, mode)
+  }
+
+  def getLogs[VD: ClassTag](sc: SparkContext, graph: Graph[VD, TimeInterval]): RDD[LogTSV] = {
+    val g = addGraphUpdateDistribution(sc, graph)
     generateLogs(g)
   }
+
+  def saveLogs(logs: RDD[LogTSV], path: String = "stored_logs"): RDD[LogTSV] = {
+    logs.saveAsObjectFile(path)
+    println("We are saving the logs")
+    logs
+  }
+
+  def loadOrGenerateLogs[VD: ClassTag](sc: SparkContext, graph: Graph[VD, TimeInterval], path: String = "stored_logs"): RDD[LogTSV] = {
+    if (Files.exists(Paths.get(path))) {
+      println("Fetching from file")
+      sc.objectFile[LogTSV](path)
+    } else {
+      saveLogs(getLogs[VD](sc, graph))
+    }
+  }
+
 
   /** Plot the distribution of the Int associated with vertices
    *
