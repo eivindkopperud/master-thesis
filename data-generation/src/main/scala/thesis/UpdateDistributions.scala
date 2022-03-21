@@ -6,6 +6,7 @@ import factories.LogFactory
 import org.apache.spark.SparkContext
 import org.apache.spark.graphx.{Edge, Graph, VertexId, VertexRDD}
 import org.apache.spark.rdd.RDD
+import org.slf4j.LoggerFactory
 import thesis.Action.{CREATE, DELETE}
 import thesis.DistributionType.{LogNormalType, UniformType}
 
@@ -208,8 +209,9 @@ object UpdateDistributions {
   }
 
   def loadOrGenerateLogs[VD: ClassTag](sc: SparkContext, graph: Graph[VD, TimeInterval], path: String = "stored_logs"): RDD[LogTSV] = {
+    val logger = LoggerFactory.getLogger("UpdateDistributionsSpec")
     if (Files.exists(Paths.get(path))) {
-      println("Fetching from file")
+      logger.warn("Fetching from file")
       sc.objectFile[LogTSV](path)
     } else {
       saveLogs(getLogs[VD](sc, graph))
