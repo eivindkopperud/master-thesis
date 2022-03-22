@@ -5,10 +5,11 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{col, lag, last, when}
 import org.apache.spark.sql.{SparkSession, functions}
+import org.slf4j.LoggerFactory
 
 import java.time.Instant
 
-final case class TimeInterval(start:Instant, stop:Instant)
+final case class TimeInterval(start: Instant, stop: Instant)
 
 object TopologyGraphGenerator {
 
@@ -18,6 +19,8 @@ object TopologyGraphGenerator {
                      filePath: String = "src/main/resources/fb-messages.csv",
                      delimiter: String = ","
                    ): Graph[Long, TimeInterval] = {
+    val logger = LoggerFactory.getLogger("TopologyGraphGenerator")
+    logger.warn(s"Generating graph from dataset $filePath, threshold: $threshold, delimiter: $delimiter")
     val window = Window.orderBy("from", "to", "time")
     val df = spark.read.option("delimiter", delimiter).csv(filePath)
       .toDF("from", "to", "time")
