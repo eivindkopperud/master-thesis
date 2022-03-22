@@ -14,30 +14,27 @@ final case class TimeInterval(start: Instant, stop: Instant)
 sealed abstract class DataSource
 
 object DataSource {
-  final case class Reptilian() extends DataSource
+  final case object Reptilian extends DataSource
 
-  final case class FbMessages() extends DataSource
+  final case object FbMessages extends DataSource
 
 }
 
 object TopologyGraphGenerator {
 
-  /** Lets just hardcode the possibilities, so it's simpler to use.
-   *
-   * Painful to change path all the time
-   *
+  /**
    * @param dataSource Intended datasource
    * @return Tuple of file path and delimiter used
    */
   def getPathAndDelim(dataSource: DataSource): (String, String) = dataSource match {
-    case DataSource.Reptilian() => ("src/main/resources/reptilia-tortoise-network-sl.csv", " ")
-    case DataSource.FbMessages() => ("src/main/resources/fb-messages.csv", ",")
+    case DataSource.Reptilian => ("src/main/resources/reptilia-tortoise-network-sl.csv", " ")
+    case DataSource.FbMessages => ("src/main/resources/fb-messages.csv", ",")
   }
 
   def generateGraph(
                      spark: SparkSession,
                      threshold: BigDecimal,
-                     dataSource: DataSource = DataSource.Reptilian()
+                     dataSource: DataSource = DataSource.Reptilian
                    ): Graph[Long, TimeInterval] = {
     val (filePath, delimiter) = getPathAndDelim(dataSource)
 
