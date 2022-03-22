@@ -6,7 +6,7 @@ import factories.LogFactory
 import org.apache.spark.SparkContext
 import org.apache.spark.graphx.{Edge, Graph, VertexId, VertexRDD}
 import org.apache.spark.rdd.RDD
-import org.slf4j.LoggerFactory
+import org.slf4j.{Logger, LoggerFactory}
 import thesis.Action.{CREATE, DELETE}
 import thesis.DistributionType.{LogNormalType, UniformType}
 
@@ -50,6 +50,7 @@ object UpdateDistributions {
    * @return Processed graph
    */
   def addVertexUpdateDistribution[VD: ClassTag, ED: ClassTag](sc: SparkContext, graph: Graph[VD, ED], mode: CorrelationMode, distribution: DistributionType): Graph[Int, ED] = {
+    getLogger.warn(s"Adding updates to vertices")
     val verticesWithDegree = sortVerticesByMode(graph.ops.degrees, mode)
 
     val updates = graph.mapVertices((_, _) => getDistributionDraw(distribution))
@@ -96,6 +97,7 @@ object UpdateDistributions {
                                     graph: Graph[Int, TimeInterval],
                                     mode: CorrelationMode,
                                     distribution: DistributionType): Graph[Int, IntervalAndUpdateCount] = {
+    getLogger.warn(s"Adding updates to edges")
     // TODO remove this collect
     val vertexUpdateHashMap = graph
       .vertices
@@ -193,25 +195,40 @@ object UpdateDistributions {
   }
 
   def addGraphUpdateDistribution[VD: ClassTag](sc: SparkContext, graph: Graph[VD, TimeInterval], mode: DistributionType = UniformType(0, 1000)): Graph[Int, IntervalAndUpdateCount] = {
+    getLogger.warn(s"Adding updates with distribution type:$mode")
     val g1 = addVertexUpdateDistribution(sc, graph, CorrelationMode.PositiveCorrelation, mode)
     addEdgeUpdateDistribution(sc, g1, CorrelationMode.PositiveCorrelation, mode)
   }
 
   def getLogs[VD: ClassTag](sc: SparkContext, graph: Graph[VD, TimeInterval]): RDD[LogTSV] = {
+    getLogger.warn("Generating updates")
     val g = addGraphUpdateDistribution(sc, graph)
     generateLogs(g)
   }
 
+  def getLogger: Logger = LoggerFactory.getLogger("UpdateDistributionSpec")
+
   def saveLogs(logs: RDD[LogTSV], path: String = "stored_logs"): RDD[LogTSV] = {
     logs.saveAsObjectFile(path)
-    println("We are saving the logs")
+    getLogger.warn(s"Saving logs to directory: $path")
     logs
   }
 
+  /** Load logs or Generate new
+   *
+   * If previous graph exists on disk, load from disk.
+   * Else generate the graph and persist it on disk for later retrieval.
+   * Saves a lot of time and RAM on bigger loads
+   *
+   * @param sc    Spark Context
+   * @param graph Graph generated from dataset
+   * @param path  Path to persisted graph
+   * @tparam VD Type of input graph
+   * @return RDD[LogTSV] ready for further processing
+   */
   def loadOrGenerateLogs[VD: ClassTag](sc: SparkContext, graph: Graph[VD, TimeInterval], path: String = "stored_logs"): RDD[LogTSV] = {
-    val logger = LoggerFactory.getLogger("UpdateDistributionsSpec")
     if (Files.exists(Paths.get(path))) {
-      logger.warn("Fetching from file")
+      getLogger.warn("Fetching from file")
       sc.objectFile[LogTSV](path)
     } else {
       saveLogs(getLogs[VD](sc, graph))

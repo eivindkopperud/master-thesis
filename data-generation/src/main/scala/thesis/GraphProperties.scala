@@ -4,12 +4,14 @@ import breeze.linalg.linspace
 import breeze.plot.{Figure, plot}
 import org.apache.spark.graphx.Graph
 import org.apache.spark.graphx.lib.ShortestPaths
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.reflect.ClassTag
 
 object GraphProperties {
 
 
+  def getLogger: Logger = LoggerFactory.getLogger("GraphProperties")
 
   //TODO def getPowerLawExponent
 
@@ -31,6 +33,7 @@ object GraphProperties {
     p += plot(n, out)
     p.xlabel = s"x axis - $graphName"
     p.ylabel = "y axis"
+    getLogger.warn("Saving visualization of PowerLaw to $filename")
     f.saveas(filename)
   }
 
@@ -47,6 +50,7 @@ object GraphProperties {
    * @return diameter of graph
    */
   def getDirectedDiameterOfGraph[VD, ED: ClassTag](graph: Graph[VD, ED]): Int = {
+    getLogger.warn("Getting DirectedDiameterOfGraph")
     val vertex_ids = graph.vertices.map(_._1).collect()
     ShortestPaths.run(graph, vertex_ids).vertices.mapValues(_.values.max).values.max()
   }
