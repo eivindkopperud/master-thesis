@@ -9,7 +9,7 @@ import thesis.LTSV.Attributes
 
 import scala.collection.mutable.MutableList
 
-class SnapshotDelta(val graphs: MutableList[Graph[Attributes, Attributes]], val logs: RDD[LogTSV]) { // extends Graph[VD, ED] {
+class SnapshotDelta(val graphs: MutableList[Graph[Attributes, Attributes]], val logs: RDD[LogTSV], snapshotType: SnapshotIntervalType) { // extends Graph[VD, ED] {
   val vertices: VertexRDD[Attributes] = graphs.get(0).get.vertices
   val edges: EdgeRDD[Attributes] = graphs.get(0).get.edges
   val triplets: RDD[EdgeTriplet[Attributes, Attributes]] = graphs.get(0).get.triplets
@@ -66,44 +66,39 @@ object SnapshotDeltaObject {
 
   def create[VD, ED](logs: RDD[LogTSV], snapType: SnapshotIntervalType): SnapshotDelta = {
     snapType match {
-      case SnapshotIntervalType.Time(duration) => createSnapshotModel(logs.map(log => (log.timestamp.getEpochSecond, log)), duration)
-      case SnapshotIntervalType.Count(numberOfActions) => createSnapshotModel(logs.zipWithIndex().map(x => (x._2, x._1)), numberOfActions)
+      // TODO the first argument logsWithSortableKey should be moved into the function
+      case SnapshotIntervalType.Time(duration) => createSnapshotModel(logs.map(log => (log.timestamp.getEpochSecond, log)), snapType)
+      case SnapshotIntervalType.Count(numberOfActions) => createSnapshotModel(logs.zipWithIndex().map(x => (x._2, x._1)), snapType)
     }
   }
 
   /** Create snapshotDelta model
    *
-   * This function works for both a timed and a counter based model. Currently the output is indistinguishable
-   * it would probably be nice to know how SnapshotDelta object was generated.
+   * This function works for both a timed and a counter based model.
    *
-   * It works for time as well since we assume that the timestamps have been normalized
-   * timestamps.map(timestamp => timestamp - min(timestamps))
-   *
-   * The for loop does not work for timebased applications, so making a single function maybe wasn't too smart. (but there are big similaritites)
-   *
-   * @param logsWithSortableKey Logs with a sortable key, either seconds or amount of actions
-   * @param interval            the interval
+   * @param logsWithSortableKey  Logs with a sortable key, either seconds or amount of actions
+   * @param snapshotIntervalType The type of snapshot
    * @return SnapShotDelta object
    */
-  def createSnapshotModel(logsWithSortableKey: RDD[(Long, LogTSV)], interval: Int): SnapshotDelta = {
-    getLogger.warn(s"Creating SnapshotModel with interval:$interval")
-    val initialGraph = createGraph(logsWithSortableKey.filterByRange(0, interval).map(_._2))
+  def createSnapshotModel(logsWithSortableKey: RDD[(Long, LogTSV)], snapshotIntervalType: SnapshotIntervalType): SnapshotDelta = {
+    getLogger.warn(s"Creating SnapshotModel with type:$snapshotIntervalType")
+    val max = logsWithSortableKey.map(_._1).max() // This will value is only used for Count, but it should be lazy, so its fine
+    val min = logsWithSortableKey.map(_._1).min() // This will be 0 for Count and the earliest timestamp for Time
+
+    val (numberOfSnapShots, interval) = snapshotIntervalType match {
+      case SnapshotIntervalType.Time(duration) => (((max - min).toFloat / duration).ceil.toInt, duration)
+      case SnapshotIntervalType.Count(number) => ((logsWithSortableKey.count().toFloat / number).ceil.toInt, number) // .count() should in _theory_ be the same as 'max'. So these two lines could in theory be identical
+    }
+
+    val initialGraph = createGraph(logsWithSortableKey.filterByRange(min, interval).map(_._2))
     val graphs = MutableList(initialGraph)
 
-
-    // FIXME Looking for feedback
-    // Hmm, this is maybe wrong for timebased generation
-    // How should this for loop be generated?
-    // Or maybe it does work?:
-    // for (i i <- to (logsWithSortableKey.max() / interval).ceil.toInt
-    // Thoughts?
-    // The timeinterval might be empty, but that is fine. See illustration
-    for (i <- 1 to (logsWithSortableKey.count() / interval).ceil.toInt) {
+    for (i <- 1 until numberOfSnapShots) {
       val previousSnapshot = graphs(i - 1)
 
       // Get subset of logs
       val logInterval = logsWithSortableKey
-        .filterByRange(interval * i, interval * (i + 1)) // This lets ut get a slice of the LTSVs
+        .filterByRange(min + (interval * i), min + (interval * (i + 1)) - 1) // This lets ut get a slice of the LTSVs (filterByRange is inclusive)
         .map(_._2) // This maps the type into back to its original form
 
       val newVertices = applyVertexLogsToSnapshot(previousSnapshot, logInterval)
@@ -111,7 +106,7 @@ object SnapshotDeltaObject {
 
       graphs += Graph(newVertices, newEdges)
     }
-    new SnapshotDelta(graphs, logsWithSortableKey.map(_._2))
+    new SnapshotDelta(graphs, logsWithSortableKey.map(_._2), snapshotIntervalType)
   }
 
   def applyEdgeLogs(snapshot: Graph[LTSV.Attributes, LTSV.Attributes], logs: RDD[LogTSV]): RDD[Edge[Attributes]] = {
@@ -124,11 +119,14 @@ object SnapshotDeltaObject {
 
     // Create, update or omit (delete) edges based on values are present or not.
     val newSnapshotEdges = joinedEdges.flatMap(outerJoinedEdge => outerJoinedEdge._2 match {
+      case (None, None) => throw new IllegalStateException("The full outer join f*ucked up")
       case (Some(previousEdge), None) => Some(Edge(outerJoinedEdge._1._1, outerJoinedEdge._1._2, previousEdge)) // Edge existed in the last snapshot, but no changes were done in this interval
       case (Some(previousEdge), Some(newEdgeAction)) => newEdgeAction.action match { // There has been a change to the edge in the interval
         case DELETE => None // Edge or {source,destination} vertex was deleted in the new interval
         case UPDATE => // Edge updated in this interval
           Some(Edge(outerJoinedEdge._1._1, outerJoinedEdge._1._2, rightWayMergeHashMap(previousEdge, newEdgeAction.attributes)))
+        case CREATE =>
+          throw new IllegalStateException("An CREATE should never happen since this case should be an action referencing an existing entity")
       }
       case (None, Some(newEdgeAction)) => newEdgeAction.action match { // Edge was introduced in this interval
         case DELETE => None // Edge was introduced then promptly deleted (possibly due to a deleted vertex)
@@ -164,11 +162,13 @@ object SnapshotDeltaObject {
 
     // Create, update or omit (delete) vertices based on values are present or not.
     val newSnapshotVertices = joinedVertices.flatMap(outerJoinedVertex => outerJoinedVertex._2 match {
+      case (None, None) => throw new IllegalStateException("The full outer join f*ucked up")
       case (Some(snapshotVertex), None) => Some((outerJoinedVertex._1, snapshotVertex)) // No changes to the vertex in this interval
       case (Some(snapshotVertex), Some(newVertex)) => newVertex.action match { // Changes to the vertex in this interval
         case DELETE => None // Vertex was deleted
         case UPDATE => // Vertex was updated
           Some((outerJoinedVertex._1, rightWayMergeHashMap(snapshotVertex, newVertex.attributes)))
+        case CREATE => throw new IllegalStateException("An CREATE should never happen since this case should be an action referencing an existing entity")
       }
       case (None, Some(newVertex)) => newVertex.action match { // Vertex was introduced in this interval
         case DELETE => None // Vertex was introduced then promptly deleted
@@ -202,7 +202,7 @@ object SnapshotDeltaObject {
       case (UPDATE, UPDATE) =>
         nextLog.copy(attributes = rightWayMergeHashMap(prevLog.attributes, nextLog.attributes)) // Could be either l1 or l2 that is copied
       case (CREATE, UPDATE) =>
-        prevLog.copy(attributes = rightWayMergeHashMap(nextLog.attributes, prevLog.attributes))
+        prevLog.copy(attributes = rightWayMergeHashMap(prevLog.attributes, nextLog.attributes))
       case (prevLogState, nextLogState) => throw new IllegalStateException(s"($prevLogState,$nextLogState encountered when merging logs. The dataset is inconsistent")
       // Cases that should not happen. We assume the LogTSVs are consistent and makes sense
       // example (DELETE, DELETE), (DELETE, UPDATE) // These do not make sense

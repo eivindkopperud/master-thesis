@@ -48,6 +48,38 @@ case class LogFactory(
     create ++ updates
   }
 
+  /** Fine grained control on number of updates and when they happen
+   *
+   * eg. [5,0,3]
+   * Will give 5 updates at t_1, 0 at t_2 and 3 at t_3
+   *
+   * @param numberOfUpdates list of updates with index in list matching timestamp
+   * @param id              Just some id for the vertex
+   * @return
+   */
+  def buildIrregularSequence(numberOfUpdates: List[Int], id: Long = 1): Seq[LogTSV] = {
+    val create = Seq(LogTSV(
+      timestamp = Instant.ofEpochSecond(0),
+      action = CREATE,
+      entity = VERTEX(id),
+      attributes = getRandomAttributes
+    ))
+    val updates = numberOfUpdates.zipWithIndex.tail.flatMap(x => {
+      val (numUpdates, timestamp) = x
+      Seq.range(0, numUpdates).map(
+        _ =>
+          LogTSV(
+            timestamp = Instant.ofEpochSecond(timestamp),
+            action = UPDATE,
+            entity = VERTEX(id),
+            attributes = getRandomAttributes
+          )
+      )
+    }
+    )
+    create ++ updates
+  }
+
   def buildSingleSequenceOnlyUpdates(updateAmount: Int = 5, id: Long): Seq[LogTSV] = {
     buildSingleSequence(updateAmount + 1, id).tail
   }
