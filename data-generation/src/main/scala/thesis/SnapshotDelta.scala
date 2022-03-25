@@ -2,7 +2,6 @@ package thesis
 
 import org.apache.spark.graphx._
 import org.apache.spark.rdd.RDD
-import org.apache.spark.rdd.RDD.rddToOrderedRDDFunctions
 import org.slf4j.{Logger, LoggerFactory}
 import thesis.Action.{CREATE, DELETE, UPDATE}
 import thesis.Entity.{EDGE, VERTEX}
@@ -67,23 +66,44 @@ object SnapshotDeltaObject {
 
   def create[VD, ED](logs: RDD[LogTSV], snapType: SnapshotIntervalType): SnapshotDelta = {
     snapType match {
-      //case SnapshotIntervalType.Time(duration) => snapShotTime(logs, duration)
-      case SnapshotIntervalType.Count(numberOfActions) => createSnapshotCountModel(logs, numberOfActions)
+      case SnapshotIntervalType.Time(duration) => createSnapshotModel(logs.map(log => (log.timestamp.getEpochSecond, log)), duration)
+      case SnapshotIntervalType.Count(numberOfActions) => createSnapshotModel(logs.zipWithIndex().map(x => (x._2, x._1)), numberOfActions)
     }
   }
 
-  def createSnapshotCountModel(logs: RDD[LogTSV], numberOfActions: Int): SnapshotDelta = {
-    getLogger.warn(s"Creating SnapshotCountModel with numberOfActions:$numberOfActions")
-    val logsWithIndex = logs.zipWithIndex().map(x => (x._2, x._1))
-    val initialGraph = createGraph(logsWithIndex.filterByRange(0, numberOfActions).map(_._2))
+  /** Create snapshotDelta model
+   *
+   * This function works for both a timed and a counter based model. Currently the output is indistinguishable
+   * it would probably be nice to know how SnapshotDelta object was generated.
+   *
+   * It works for time as well since we assume that the timestamps have been normalized
+   * timestamps.map(timestamp => timestamp - min(timestamps))
+   *
+   * The for loop does not work for timebased applications, so making a single function maybe wasn't too smart. (but there are big similaritites)
+   *
+   * @param logsWithSortableKey Logs with a sortable key, either seconds or amount of actions
+   * @param interval            the interval
+   * @return SnapShotDelta object
+   */
+  def createSnapshotModel(logsWithSortableKey: RDD[(Long, LogTSV)], interval: Int): SnapshotDelta = {
+    getLogger.warn(s"Creating SnapshotModel with interval:$interval")
+    val initialGraph = createGraph(logsWithSortableKey.filterByRange(0, interval).map(_._2))
     val graphs = MutableList(initialGraph)
 
-    for (i <- 1 to (logs.count() / numberOfActions).ceil.toInt) {
+
+    // FIXME Looking for feedback
+    // Hmm, this is maybe wrong for timebased generation
+    // How should this for loop be generated?
+    // Or maybe it does work?:
+    // for (i i <- to (logsWithSortableKey.max() / interval).ceil.toInt
+    // Thoughts?
+    // The timeinterval might be empty, but that is fine. See illustration
+    for (i <- 1 to (logsWithSortableKey.count() / interval).ceil.toInt) {
       val previousSnapshot = graphs(i - 1)
 
       // Get subset of logs
-      val logInterval = logsWithIndex
-        .filterByRange(numberOfActions * i, numberOfActions * (i + 1)) // This lets ut get a slice of the LTSVs
+      val logInterval = logsWithSortableKey
+        .filterByRange(interval * i, interval * (i + 1)) // This lets ut get a slice of the LTSVs
         .map(_._2) // This maps the type into back to its original form
 
       val newVertices = applyVertexLogsToSnapshot(previousSnapshot, logInterval)
@@ -91,7 +111,7 @@ object SnapshotDeltaObject {
 
       graphs += Graph(newVertices, newEdges)
     }
-    new SnapshotDelta(graphs, logs)
+    new SnapshotDelta(graphs, logsWithSortableKey.map(_._2))
   }
 
   def applyEdgeLogs(snapshot: Graph[LTSV.Attributes, LTSV.Attributes], logs: RDD[LogTSV]): RDD[Edge[Attributes]] = {
