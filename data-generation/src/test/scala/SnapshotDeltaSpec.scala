@@ -1,11 +1,15 @@
 import factories.LogFactory
 import org.apache.spark.graphx.Graph
 import org.scalatest.flatspec.AnyFlatSpec
-import thesis.Action.{CREATE, UPDATE}
+import org.scalatest.matchers.must.Matchers.be
+import org.scalatest.matchers.should.Matchers.a
+import thesis.Action.{CREATE, DELETE, UPDATE}
 import thesis.SnapshotDeltaObject
-import thesis.SnapshotDeltaObject.getSquashedActionsByVertexId
+import thesis.SnapshotDeltaObject.{getSquashedActionsByVertexId, mergeLogTSV}
 import thesis.SnapshotIntervalType.{Count, Time}
 import wrappers.SparkTestWrapper
+
+import scala.collection.immutable.HashMap
 
 class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
   "thesis.SnapshotDelta objects" should "have the correct amount of snapshots" in {
@@ -74,4 +78,49 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     assert(edgesWithActions.length == 1)
     assert(edgesWithActions(0)._2.action == UPDATE)
   }
+  "mergeLogTSV" should "merge logs correctly given valid states" in {
+    val attributes = HashMap(("color", "blue"))
+    val newAttributes = HashMap(("color", "red"))
+
+    val update = LogFactory().generateVertexTSV(1, 0, attributes)
+    val create = update.copy(action = CREATE)
+    val update2 = LogFactory().generateVertexTSV(1, 1, newAttributes)
+    val delete = update2.copy(action = DELETE)
+
+    val updateThenDelete = mergeLogTSV(update, delete)
+    val createThenDelete = mergeLogTSV(create, delete)
+
+    assert(updateThenDelete.action == DELETE)
+    assert(createThenDelete.action == DELETE)
+
+    val updateThenUpdate = mergeLogTSV(update, update2)
+
+    assert(updateThenUpdate.attributes("color") == "red")
+    assert(updateThenUpdate.action == UPDATE)
+
+    val createThenUpdate = mergeLogTSV(create, update2)
+
+    assert(createThenUpdate.attributes("color") == "red")
+    assert(createThenUpdate.action == CREATE)
+
+  }
+
+  it should "throw exception when invalid state happens" in {
+    val update = LogFactory().generateVertexTSV(1, 0)
+    val create = update.copy(action = CREATE)
+    val delete = update.copy(action = DELETE)
+    a[IllegalStateException] should be thrownBy {
+      mergeLogTSV(delete, update)
+    }
+    a[IllegalStateException] should be thrownBy {
+      mergeLogTSV(delete, create)
+    }
+    a[IllegalStateException] should be thrownBy {
+      mergeLogTSV(create, create)
+    }
+    a[IllegalStateException] should be thrownBy {
+      mergeLogTSV(delete, delete)
+    }
+  }
+
 }

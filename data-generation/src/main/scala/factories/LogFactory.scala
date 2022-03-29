@@ -103,14 +103,15 @@ case class LogFactory(
     )
   }
 
-  def generateVertexTSV(id: VertexId, timestamp: Long): LogTSV = {
+  def generateVertexTSV(id: VertexId, timestamp: Long, attributes: Attributes = getRandomAttributes): LogTSV = {
     LogTSV(
       timestamp = Instant.ofEpochSecond(timestamp),
       action = UPDATE,
       entity = VERTEX(id),
-      attributes = getRandomAttributes
+      attributes = attributes
     )
   }
+
 
   def getRandomAttributes: Attributes = {
     val faker = new Faker()
