@@ -1,5 +1,7 @@
 package thesis
 
+import org.apache.spark.SparkContext
+import org.apache.spark.sql.SparkSession
 import org.slf4j.LoggerFactory
 import thesis.SparkConfiguration.getSparkSession
 import thesis.TopologyGraphGenerator.generateGraph
@@ -12,17 +14,18 @@ object PossibleWorkFlow {
   def run(): Unit = {
 
     // Init spark stuff
-    val spark = getSparkSession
-    val sc = spark.sparkContext
+    // https://www.theguardian.com/info/developer-blog/2016/dec/22/parental-advisory-implicit-content
+    implicit val spark: SparkSession = getSparkSession
+    implicit val sc: SparkContext = spark.sparkContext
     sc.setLogLevel("WARN") // I can't get the log4j.properties file to have any effect
     val logger = LoggerFactory.getLogger("PossibleWorkFlow")
     val start = System.nanoTime()
 
     logger.warn("Generate inital graph from dataset")
-    val graph = generateGraph(spark, 1)
+    val graph = generateGraph(1)
 
     logger.warn("Augment the dataset with updates")
-    val g = addGraphUpdateDistribution(sc, graph)
+    val g = addGraphUpdateDistribution(graph)
 
     logger.warn("Generate updates and output as logs")
     val logs = generateLogs(g)

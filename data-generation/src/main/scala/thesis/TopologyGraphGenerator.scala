@@ -32,10 +32,9 @@ object TopologyGraphGenerator {
   }
 
   def generateGraph(
-                     spark: SparkSession,
                      threshold: BigDecimal,
                      dataSource: DataSource = DataSource.Reptilian
-                   ): Graph[Long, TimeInterval] = {
+                   )(implicit spark: SparkSession): Graph[Long, TimeInterval] = {
     val (filePath, delimiter) = getPathAndDelim(dataSource)
 
     val logger = LoggerFactory.getLogger("TopologyGraphGenerator")
