@@ -2,14 +2,19 @@ package thesis
 
 import org.apache.spark.graphx._
 import org.apache.spark.rdd.RDD
+import org.apache.spark.rdd.RDD.rddToOrderedRDDFunctions
 import org.slf4j.{Logger, LoggerFactory}
 import thesis.Action.{CREATE, DELETE, UPDATE}
 import thesis.Entity.{EDGE, VERTEX}
 import thesis.LTSV.Attributes
+import thesis.SnapshotDeltaObject.{G, applyEdgeLogsToSnapshot, applyVertexLogsToSnapshot}
 
-import java.time.Instant
+import java.time.{Duration, Instant}
 import scala.collection.mutable.MutableList
+import scala.math.Ordered.orderingToOrdered
 import scala.reflect.ClassTag
+import scala.util.Try
+
 
 abstract class TemporalGraph[VD: ClassTag, ED: ClassTag] extends Serializable {
   val vertices: VertexRDD[VD]
@@ -19,17 +24,45 @@ abstract class TemporalGraph[VD: ClassTag, ED: ClassTag] extends Serializable {
   def snapshotAtTime(instant: Instant): Graph[VD, ED]
 }
 
-class SnapshotDelta(val graphs: MutableList[(Graph[Attributes, Attributes], Instant)],
+class SnapshotDelta(val graphs: MutableList[(G, Instant)],
                     val logs: RDD[LogTSV],
                     val snapshotType: SnapshotIntervalType) extends TemporalGraph[Attributes, Attributes] { // extends Graph[VD, ED] {
   override val vertices: VertexRDD[Attributes] = graphs.get(0).get._1.vertices
   override val edges: EdgeRDD[Attributes] = graphs.get(0).get._1.edges
   override val triplets: RDD[EdgeTriplet[Attributes, Attributes]] = graphs.get(0).get._1.triplets
 
-class SnapshotDelta(val graphs: MutableList[Graph[Attributes, Attributes]], val logs: RDD[LogTSV], snapshotType: SnapshotIntervalType) { // extends Graph[VD, ED] {
-  val vertices: VertexRDD[Attributes] = graphs.get(0).get.vertices
-  val edges: EdgeRDD[Attributes] = graphs.get(0).get.edges
-  val triplets: RDD[EdgeTriplet[Attributes, Attributes]] = graphs.get(0).get.triplets
+  def forwardApplyLogs(graph: G, logsToApply: RDD[LogTSV]): G = {
+    Graph(
+      applyVertexLogsToSnapshot(graph, logsToApply),
+      applyEdgeLogsToSnapshot(graph, logsToApply)
+    )
+  }
+
+  def backwardsApplyLogs(g: G, logsToApply: RDD[LogTSV]): G = throw new NotImplementedError()
+
+  override def snapshotAtTime(instant: Instant): G = {
+    def returnClosestGraph(g1: (G, Instant), g2: (G, Instant)): (G, Instant) = //TODO for tomorrow write tests for this method
+      if (Duration.between(g1._2, instant).abs() <= Duration.between(g2._2, instant).abs()) {
+        g1
+      } else {
+        g2
+      }
+
+    val closestGraph = graphs.reduce(returnClosestGraph)
+    println(s"Instant $instant, Closest :graph${closestGraph._2}")
+    if (closestGraph._2 == instant) {
+      println("You asked for a materialized graph")
+      closestGraph._1
+    } else if (closestGraph._2.isBefore(instant)) {
+      val logsToApply = logs.map(l => (l.timestamp, l)).filterByRange(closestGraph._2, instant).map(_._2)
+      forwardApplyLogs(closestGraph._1, logsToApply)
+    } else {
+      val logsToApply = logs.map(l => (l.timestamp, l)).filterByRange(instant, closestGraph._2).map(_._2)
+      backwardsApplyLogs(closestGraph._1, logsToApply)
+    }
+  }
+
+
   /*
     override def persist(newLevel: StorageLevel): Graph[VD, ED] = graph.persist(newLevel)
 
@@ -123,7 +156,7 @@ object SnapshotDeltaObject {
         .map(_._2) // This maps the type into back to its original form
 
       val newVertices = applyVertexLogsToSnapshot(previousSnapshot._1, logInterval)
-      val newEdges = applyEdgeLogs(previousSnapshot._1, logInterval)
+      val newEdges = applyEdgeLogsToSnapshot(previousSnapshot._1, logInterval)
 
       val graphTimestamp = Try {
         logInterval.map(_.timestamp).max()
@@ -134,7 +167,7 @@ object SnapshotDeltaObject {
     new SnapshotDelta(graphs, logsWithSortableKey.map(_._2), snapshotIntervalType)
   }
 
-  def applyEdgeLogs(snapshot: Graph[LTSV.Attributes, LTSV.Attributes], logs: RDD[LogTSV]): RDD[Edge[Attributes]] = {
+  def applyEdgeLogsToSnapshot(snapshot: Graph[LTSV.Attributes, LTSV.Attributes], logs: RDD[LogTSV]): RDD[Edge[Attributes]] = {
     val previousSnapshotEdgesKV = snapshot.edges.map(edge => ((edge.dstId, edge.srcId), edge.attr))
 
     val squashedEdgeActions = getSquashedActionsByEdgeId(logs)
@@ -290,5 +323,7 @@ object SnapshotDeltaObject {
       case UPDATE => Some(Edge(edge._1._1, edge._1._2, edge._2.attributes)) // Edge was created and updated
     })
   }
+
+  type G = Graph[Attributes, Attributes]
 
 }
