@@ -164,7 +164,6 @@ object UpdateDistributions {
       (id, timestamps.map(LogFactory().generateVertexTSV(id, _)))
     }).flatMap(_._2)
 
-    // Has to be rewritten as Edge[Int] should be Edge[(Int, Timestamp)] from existing data
     val edgeIdWithTimestamp = edges.map(edge => {
       val distribution = getSortedUniformDistribution(edge.attr.interval.start.getEpochSecond, edge.attr.interval.stop.getEpochSecond, edge.attr.count)
       ((edge.srcId, edge.dstId), (edge.attr.interval, distribution))
@@ -194,7 +193,7 @@ object UpdateDistributions {
     addEdgeUpdateDistribution(sc, g1, CorrelationMode.PositiveCorrelation, LogNormalType(mu, sigma))
   }
 
-  def addGraphUpdateDistribution[VD: ClassTag](sc: SparkContext, graph: Graph[VD, TimeInterval], mode: DistributionType = UniformType(0, 1000)): Graph[Int, IntervalAndUpdateCount] = {
+  def addGraphUpdateDistribution[VD: ClassTag](graph: Graph[VD, TimeInterval], mode: DistributionType = UniformType(0, 1000))(implicit sc: SparkContext): Graph[Int, IntervalAndUpdateCount] = {
     getLogger.warn(s"Adding updates with distribution type:$mode")
     val g1 = addVertexUpdateDistribution(sc, graph, CorrelationMode.PositiveCorrelation, mode)
     addEdgeUpdateDistribution(sc, g1, CorrelationMode.PositiveCorrelation, mode)
@@ -202,7 +201,7 @@ object UpdateDistributions {
 
   def getLogs[VD: ClassTag](sc: SparkContext, graph: Graph[VD, TimeInterval]): RDD[LogTSV] = {
     getLogger.warn("Generating updates")
-    val g = addGraphUpdateDistribution(sc, graph)
+    val g = addGraphUpdateDistribution(graph)(implicitly, sc)
     generateLogs(g)
   }
 
