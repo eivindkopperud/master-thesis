@@ -1,12 +1,15 @@
 import factories.LogFactory
+import org.apache.spark.SparkContext
 import org.apache.spark.graphx.Graph
+import org.apache.spark.rdd.RDD
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers.be
 import org.scalatest.matchers.should.Matchers.a
 import thesis.Action.{CREATE, DELETE, UPDATE}
-import thesis.SnapshotDeltaObject
-import thesis.SnapshotDeltaObject.{getSquashedActionsByVertexId, mergeLogTSV}
+import thesis.SnapshotDeltaObject.{createGraph, getSquashedActionsByVertexId, mergeLogTSV}
 import thesis.SnapshotIntervalType.{Count, Time}
+import thesis.{LogTSV, SnapshotDeltaObject}
+import utils.TimeUtils._
 import wrappers.SparkTestWrapper
 
 import scala.collection.immutable.HashMap
@@ -121,6 +124,24 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     a[IllegalStateException] should be thrownBy {
       mergeLogTSV(delete, delete)
     }
+  }
+
+  "SnapshotAtTime" should "return correct graph given a timestamp" in {
+    implicit val sparkContext: SparkContext = spark.sparkContext
+
+    implicit def seqToRdd(s: Seq[LogTSV])(implicit sc: SparkContext): RDD[LogTSV] = {
+      sc.parallelize(s)
+    }
+
+    val updates = List(1, 1, 1, 1, 1, 1, 1) // List of amount of updates for t_1, t_2 .. t_6
+    val logs = LogFactory().buildIrregularSequence(updates)
+    println(logs)
+    val logRDD = spark.sparkContext.parallelize(logs)
+    val snapshotModel = SnapshotDeltaObject.create(logRDD, Time(3))
+    val snapshot = snapshotModel.snapshotAtTime(3)
+    assertGraphSimilarity(snapshot, createGraph(logs.take(4))) // Take(4) == Instant.ofEpoch(3)
+
+
   }
 
 }
