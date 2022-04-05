@@ -33,7 +33,7 @@ object PossibleWorkFlow {
     logger.warn("Generate temporal model")
     val snapshotModel = SnapshotDeltaObject.create(logs, SnapshotIntervalType.Count(10))
 
-    println(s"Number of vertices in the first snapshot ${snapshotModel.graphs.head.vertices.count()}")
+    println(s"Number of vertices in the first snapshot ${snapshotModel.graphs.head._1.vertices.count()}")
     println(s"Number of logs ${logs.count()}")
 
     //TODO generate Landy Model

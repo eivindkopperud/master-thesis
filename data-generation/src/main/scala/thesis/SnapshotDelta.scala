@@ -7,7 +7,24 @@ import thesis.Action.{CREATE, DELETE, UPDATE}
 import thesis.Entity.{EDGE, VERTEX}
 import thesis.LTSV.Attributes
 
+import java.time.Instant
 import scala.collection.mutable.MutableList
+import scala.reflect.ClassTag
+
+abstract class TemporalGraph[VD: ClassTag, ED: ClassTag] extends Serializable {
+  val vertices: VertexRDD[VD]
+  val edges: EdgeRDD[ED]
+  val triplets: RDD[EdgeTriplet[VD, ED]]
+
+  def snapshotAtTime(instant: Instant): Graph[VD, ED]
+}
+
+class SnapshotDelta(val graphs: MutableList[(Graph[Attributes, Attributes], Instant)],
+                    val logs: RDD[LogTSV],
+                    val snapshotType: SnapshotIntervalType) extends TemporalGraph[Attributes, Attributes] { // extends Graph[VD, ED] {
+  override val vertices: VertexRDD[Attributes] = graphs.get(0).get._1.vertices
+  override val edges: EdgeRDD[Attributes] = graphs.get(0).get._1.edges
+  override val triplets: RDD[EdgeTriplet[Attributes, Attributes]] = graphs.get(0).get._1.triplets
 
 class SnapshotDelta(val graphs: MutableList[Graph[Attributes, Attributes]], val logs: RDD[LogTSV], snapshotType: SnapshotIntervalType) { // extends Graph[VD, ED] {
   val vertices: VertexRDD[Attributes] = graphs.get(0).get.vertices
@@ -76,6 +93,8 @@ object SnapshotDeltaObject {
    *
    * This function works for both a timed and a counter based model.
    *
+   * There is maybe too many mins and maxs that can have a performance hit
+   *
    * @param logsWithSortableKey  Logs with a sortable key, either seconds or amount of actions
    * @param snapshotIntervalType The type of snapshot
    * @return SnapShotDelta object
@@ -90,8 +109,10 @@ object SnapshotDeltaObject {
       case SnapshotIntervalType.Count(number) => ((logsWithSortableKey.count().toFloat / number).ceil.toInt, number) // .count() should in _theory_ be the same as 'max'. So these two lines could in theory be identical
     }
 
-    val initialGraph = createGraph(logsWithSortableKey.filterByRange(min, interval).map(_._2))
-    val graphs = MutableList(initialGraph)
+    val initLogs = logsWithSortableKey.filterByRange(min, interval).map(_._2)
+    val initTimestamp = initLogs.map(_.timestamp).max()
+    val initialGraph = createGraph(initLogs)
+    val graphs = MutableList((initialGraph, initTimestamp))
 
     for (i <- 1 until numberOfSnapShots) {
       val previousSnapshot = graphs(i - 1)
@@ -101,10 +122,14 @@ object SnapshotDeltaObject {
         .filterByRange(min + (interval * i), min + (interval * (i + 1)) - 1) // This lets ut get a slice of the LTSVs (filterByRange is inclusive)
         .map(_._2) // This maps the type into back to its original form
 
-      val newVertices = applyVertexLogsToSnapshot(previousSnapshot, logInterval)
-      val newEdges = applyEdgeLogs(previousSnapshot, logInterval)
+      val newVertices = applyVertexLogsToSnapshot(previousSnapshot._1, logInterval)
+      val newEdges = applyEdgeLogs(previousSnapshot._1, logInterval)
 
-      graphs += Graph(newVertices, newEdges)
+      val graphTimestamp = Try {
+        logInterval.map(_.timestamp).max()
+      }.getOrElse(Instant.ofEpochSecond(min + (interval * i + 1) - 1)) //TODO write test to make sure the timestamps are correct
+      val newGraphWithTimestamp = (Graph(newVertices, newEdges), graphTimestamp)
+      graphs += newGraphWithTimestamp
     }
     new SnapshotDelta(graphs, logsWithSortableKey.map(_._2), snapshotIntervalType)
   }

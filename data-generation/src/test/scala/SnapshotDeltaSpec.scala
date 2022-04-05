@@ -29,7 +29,7 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     val snapshotModel = SnapshotDeltaObject.create(logRDD, Time(2))
     assert(snapshotModel.logs.count() == 4)
     assert(snapshotModel.graphs.length == 3)
-    assertGraphSimilarity(snapshotModel.graphs(0), snapshotModel.graphs(1))
+    assertGraphSimilarity(snapshotModel.graphs(0)._1, snapshotModel.graphs(1)._1)
   }
 
   it can "consist of only one snapshot" in {
@@ -56,8 +56,8 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     val logs = spark.sparkContext.parallelize(logsVertex1 ++ logsVertex2)
     val graphs = SnapshotDeltaObject.create(logs, Count(8))
 
-    assert(graphs.graphs.head.vertices.collect().length == 2)
-    assert(graphs.graphs(0).vertices.collect().length == 2)
+    assert(graphs.graphs.head._1.vertices.collect().length == 2)
+    assert(graphs.graphs(0)._1.vertices.collect().length == 2)
   }
 
   "getSquashedActionsByVertexId" should "squash creates correctly" in {
