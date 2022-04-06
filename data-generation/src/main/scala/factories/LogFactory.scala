@@ -5,7 +5,7 @@ import org.apache.spark.graphx.VertexId
 import thesis.Action.{CREATE, DELETE, UPDATE}
 import thesis.Entity.{EDGE, VERTEX}
 import thesis.LTSV.Attributes
-import thesis.{Action, LogTSV}
+import thesis.{Action, Entity, LogTSV}
 import utils.TimeUtils
 
 import java.time.Instant
@@ -29,19 +29,19 @@ case class LogFactory(
     )
   }
 
-  def buildSingleSequence(updateAmount: Int = 5, id: Long): Seq[LogTSV] = {
+  def buildSingleSequence(entity: Entity, updateAmount: Int = 5): Seq[LogTSV] = {
     val timestamps = TimeUtils.getRandomOrderedTimestamps(updateAmount, startTime, endTime)
     val create = Seq(LogTSV(
       timestamp = timestamps.head,
       action = CREATE,
-      entity = VERTEX(id),
+      entity = entity,
       attributes = getRandomAttributes
     )
     )
     val updates = timestamps.tail.map(timestamp => LogTSV(
       timestamp = timestamp,
       action = UPDATE,
-      entity = VERTEX(id),
+      entity = entity,
       attributes = getRandomAttributes
     )
     )
@@ -57,7 +57,7 @@ case class LogFactory(
    * @param id              Just some id for the vertex
    * @return
    */
-  def buildIrregularSequence(numberOfUpdates: List[Int], id: Long = 1): Seq[LogTSV] = {
+  def buildIrregularVertexSequence(numberOfUpdates: List[Int], id: Long = 1): Seq[LogTSV] = {
     val create = Seq(LogTSV(
       timestamp = Instant.ofEpochSecond(0),
       action = CREATE,
@@ -80,8 +80,8 @@ case class LogFactory(
     create ++ updates
   }
 
-  def buildSingleSequenceOnlyUpdates(updateAmount: Int = 5, id: Long): Seq[LogTSV] = {
-    buildSingleSequence(updateAmount + 1, id).tail
+  def buildSingleSequenceOnlyUpdates(entity: Entity, updateAmount: Int = 5): Seq[LogTSV] = {
+    buildSingleSequence(entity, updateAmount + 1).tail
   }
 
   def getCreateDeleteEdgeTSV(srcAndDstId: (Long, Long), timestamp: Instant, action: Action): LogTSV = {

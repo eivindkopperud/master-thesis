@@ -6,7 +6,8 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers.be
 import org.scalatest.matchers.should.Matchers.a
 import thesis.Action.{CREATE, DELETE, UPDATE}
-import thesis.SnapshotDeltaObject.{createGraph, getSquashedActionsByVertexId, mergeLogTSV}
+import thesis.Entity.{EDGE, VERTEX}
+import thesis.SnapshotDeltaObject.{applyVertexLogsToSnapshot, createGraph, getSquashedActionsByVertexId, mergeLogTSV}
 import thesis.SnapshotIntervalType.{Count, Time}
 import thesis.{LogTSV, SnapshotDeltaObject}
 import utils.TimeUtils._
@@ -18,7 +19,7 @@ import scala.collection.immutable.HashMap
 class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
   "thesis.SnapshotDelta objects" should "have the correct amount of snapshots" in {
     val updateAmount = 5
-    val logs = LogFactory().buildSingleSequence(updateAmount, 1)
+    val logs = LogFactory().buildSingleSequence(VERTEX(1), updateAmount)
     val logRDD = spark.sparkContext.parallelize(logs)
     val graphs = SnapshotDeltaObject.create(logRDD, Count(updateAmount - 1))
 
@@ -28,7 +29,7 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
   // Can be run if "ignore" is swapped with "it"
   it should "also have the correct amount when it is time based" in {
     val updates = List(1, 1, 0, 0, 1, 1) // List of amount of updates for t_1, t_2 .. t_6
-    val logs = LogFactory().buildIrregularSequence(updates)
+    val logs = LogFactory().buildIrregularVertexSequence(updates)
     val logRDD = spark.sparkContext.parallelize(logs)
     val snapshotModel = SnapshotDeltaObject.create(logRDD, Time(2))
     assert(snapshotModel.logs.count() == 4)
@@ -38,7 +39,7 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
 
   it can "consist of only one snapshot" in {
     val updateAmount = 5
-    val logs = LogFactory().buildSingleSequence(updateAmount, 1)
+    val logs = LogFactory().buildSingleSequence(VERTEX(1), updateAmount)
     val logRDD = spark.sparkContext.parallelize(logs)
     val graphs = SnapshotDeltaObject.create(logRDD, Count(2 * updateAmount))
 
@@ -55,8 +56,8 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
   }
 
   it should "have the right amount of vertices" in {
-    val logsVertex1 = LogFactory().buildSingleSequence(updateAmount = 5, id = 1)
-    val logsVertex2 = LogFactory().buildSingleSequence(updateAmount = 3, id = 2)
+    val logsVertex1 = LogFactory().buildSingleSequence(VERTEX(1), updateAmount = 5)
+    val logsVertex2 = LogFactory().buildSingleSequence(VERTEX(2), updateAmount = 3)
     val logs = spark.sparkContext.parallelize(logsVertex1 ++ logsVertex2)
     val graphs = SnapshotDeltaObject.create(logs, Count(8))
 
@@ -65,7 +66,7 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
   }
 
   "getSquashedActionsByVertexId" should "squash creates correctly" in {
-    val vertexLogs = LogFactory().buildSingleSequence(5, 1)
+    val vertexLogs = LogFactory().buildSingleSequence(VERTEX(1))
     val logs = spark.sparkContext.parallelize(vertexLogs)
     val edgesWithActions = getSquashedActionsByVertexId(logs).collect()
 
@@ -75,7 +76,7 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
 
 
   "getSquashedActionsByVertexId" should "squash updates correctly" in {
-    val vertexUpdateLogs = LogFactory().buildSingleSequenceOnlyUpdates(5, 1)
+    val vertexUpdateLogs = LogFactory().buildSingleSequenceOnlyUpdates(VERTEX(1))
     val logs = spark.sparkContext.parallelize(vertexUpdateLogs)
     val edgesWithActions = getSquashedActionsByVertexId(logs).collect()
 
@@ -135,18 +136,19 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     implicit val sparkContext: SparkContext = spark.sparkContext
 
     val updates = List(1, 1, 1, 1, 1, 1, 1) // List of amount of updates for t_1, t_2 .. t_6
-    val logs = LogFactory().buildIrregularSequence(updates)
+    val logs = LogFactory().buildIrregularVertexSequence(updates)
     val logRDD = spark.sparkContext.parallelize(logs)
     val snapshotModel = SnapshotDeltaObject.create(logRDD, Time(3))
     val snapshot = snapshotModel.snapshotAtTime(3)
     assertGraphSimilarity(snapshot, createGraph(logs.take(4))) // Take(4) == Instant.ofEpoch(3)
   }
 
-  it should "return correct graph given a timestamp close to a snapshot in the future" in {
+  // backwardsApply is not implemented
+  ignore should "return correct graph given a timestamp close to a snapshot in the future" in {
     implicit val sparkContext: SparkContext = spark.sparkContext
 
     val updates = List(1, 1, 1, 1, 1, 1, 1) // List of amount of updates for t_1, t_2 .. t_6
-    val logs = LogFactory().buildIrregularSequence(updates)
+    val logs = LogFactory().buildIrregularVertexSequence(updates)
     val snapshotModel = SnapshotDeltaObject.create(logs, Time(3))
     val snapshot = snapshotModel.snapshotAtTime(1)
     assertGraphSimilarity(snapshot, createGraph(logs.take(2))) // Take(2) == Instant.ofEpoch(1)
@@ -155,13 +157,29 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
   "returnClosestGraph" should "return the closet graph given an two graphs and an instant" in {
     implicit val sparkContext: SparkContext = spark.sparkContext
 
-    val vertexLogs1 = LogFactory().buildSingleSequence(5, 1)
-    val vertexLogs2 = LogFactory().buildSingleSequence(5, 2)
+    val vertexLogs1 = LogFactory().buildSingleSequence(VERTEX(1))
+    val vertexLogs2 = LogFactory().buildSingleSequence(VERTEX(2))
     val earlyGraph = (createGraph(vertexLogs1), 0: Instant)
     val lateGraph = (createGraph(vertexLogs2), 10: Instant)
     assertGraphSimilarity(lateGraph._1,
       SnapshotDeltaObject.returnClosestGraph(6)(earlyGraph, lateGraph)._1)
     assertGraphSimilarity(earlyGraph._1,
       SnapshotDeltaObject.returnClosestGraph(1)(earlyGraph, lateGraph)._1)
+  }
+
+  "applyVertexLogsToSnapshot" should "apply vertex logs correctly to the given snapshot" in {
+    implicit val sparkContext: SparkContext = spark.sparkContext
+
+    val f = LogFactory()
+    val logs = f.buildSingleSequence(VERTEX(1)) ++
+      f.buildSingleSequence(EDGE(1, 2)) ++
+      f.buildSingleSequence(VERTEX(2))
+    val g = createGraph(logs)
+    val update = f.buildSingleSequenceOnlyUpdates(VERTEX(1))
+    val create = Seq(f.getOne.copy(entity = VERTEX(3), action = CREATE))
+    val appliedG = applyVertexLogsToSnapshot(g, update ++ create)
+    assert(appliedG.collect().find(x => x._1 == 1).head._2 == update.reverse.head.attributes)
+    assert(appliedG.collect().find(x => x._1 == 3).head._2 == create.head.attributes)
+
   }
 }

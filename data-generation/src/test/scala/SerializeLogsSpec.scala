@@ -1,6 +1,7 @@
 import factories.LogFactory
-import thesis.LTSV.{deserializeLTSV, deserializeList, serializeLTSV, serializeList}
 import org.scalatest.flatspec.AnyFlatSpec
+import thesis.Entity.VERTEX
+import thesis.LTSV.{deserializeLTSV, deserializeList, serializeLTSV, serializeList}
 
 class SerializeLogsSpec extends AnyFlatSpec {
 
@@ -23,7 +24,7 @@ class SerializeLogsSpec extends AnyFlatSpec {
   }
 
   it can "be (de)serialized in list form" in {
-    val logs = LogFactory().buildSingleSequence(5, 1)
+    val logs = LogFactory().buildSingleSequence(VERTEX(1), 5)
 
     assert(deserializeList(serializeList(logs.toList)) == logs.toList)
   }
