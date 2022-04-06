@@ -3,9 +3,11 @@ package thesis
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.SparkSession
 import org.slf4j.LoggerFactory
+import thesis.Entity.{EDGE, VERTEX}
 import thesis.SparkConfiguration.getSparkSession
 import thesis.TopologyGraphGenerator.generateGraph
 import thesis.UpdateDistributions.{addGraphUpdateDistribution, generateLogs}
+import utils.TimeUtils._
 
 import scala.concurrent.duration.NANOSECONDS
 
@@ -30,8 +32,10 @@ object PossibleWorkFlow {
     logger.warn("Generate updates and output as logs")
     val logs = generateLogs(g)
 
+    logs.filter(_.entity match { case VERTEX(_) => true case EDGE(_, _) => false }).foreach(println)
+
     logger.warn("Generate temporal model")
-    val snapshotModel = SnapshotDeltaObject.create(logs, SnapshotIntervalType.Count(10))
+    val snapshotModel = SnapshotDeltaObject.create(logs, SnapshotIntervalType.Count(5))
 
     println(s"Number of vertices in the first snapshot ${snapshotModel.graphs.head._1.vertices.count()}")
     println(s"Number of logs ${logs.count()}")
@@ -40,6 +44,8 @@ object PossibleWorkFlow {
 
 
     //TODO benchmark queries
+    val graphAtTime = snapshotModel.snapshotAtTime(2012)
+    println(s"Graph at time 2012 has ${graphAtTime.vertices.count()} vertices and ${graphAtTime.edges.count()} edges")
 
     // Timing of whole process
     val end = System.nanoTime()

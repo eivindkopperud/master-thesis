@@ -206,9 +206,10 @@ object SnapshotDeltaObject {
   }
 
   def applyVertexLogsToSnapshot(snapshot: Graph[LTSV.Attributes, LTSV.Attributes], logs: RDD[LogTSV]): RDD[(VertexId, Attributes)] = {
-    val previousSnapshotVertices = snapshot.vertices.map(vertex => (vertex._1, vertex._2))
+    val previousSnapshotVertices = snapshot.vertices
 
     val vertexIDsWithAction: RDD[(Long, LogTSV)] = getSquashedActionsByVertexId(logs)
+    println(s"applyVertexLogsToSnapShot ${vertexIDsWithAction.collect().mkString("Array(", ", ", ")")}")
 
     // Combine vertices from the snapshot with the current log interval
     val joinedVertices = previousSnapshotVertices.fullOuterJoin(vertexIDsWithAction)
@@ -221,7 +222,7 @@ object SnapshotDeltaObject {
         case DELETE => None // Vertex was deleted
         case UPDATE => // Vertex was updated
           Some((outerJoinedVertex._1, rightWayMergeHashMap(snapshotVertex, newVertex.attributes)))
-        case CREATE => throw new IllegalStateException("An CREATE should never happen since this case should be an action referencing an existing entity")
+        case CREATE => throw new IllegalStateException(s"An CREATE should never happen since this case should be an action referencing an existing entity: $snapshotVertex $newVertex")
       }
       case (None, Some(newVertex)) => newVertex.action match { // Vertex was introduced in this interval
         case DELETE => None // Vertex was introduced then promptly deleted

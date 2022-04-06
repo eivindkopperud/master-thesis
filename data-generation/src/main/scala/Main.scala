@@ -1,5 +1,6 @@
-import org.apache.spark.sql.SparkSession
+import thesis.PossibleWorkFlow
+
 
 object Main extends App {
-  val spark = SparkSession.builder.master("local").getOrCreate
+  PossibleWorkFlow.run()
 }
