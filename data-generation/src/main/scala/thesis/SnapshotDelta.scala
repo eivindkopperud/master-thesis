@@ -7,7 +7,7 @@ import org.slf4j.{Logger, LoggerFactory}
 import thesis.Action.{CREATE, DELETE, UPDATE}
 import thesis.Entity.{EDGE, VERTEX}
 import thesis.LTSV.Attributes
-import thesis.SnapshotDeltaObject.{G, applyEdgeLogsToSnapshot, applyVertexLogsToSnapshot}
+import thesis.SnapshotDeltaObject.{G, applyEdgeLogsToSnapshot, applyVertexLogsToSnapshot, returnClosestGraph}
 
 import java.time.{Duration, Instant}
 import scala.collection.mutable.MutableList
@@ -16,6 +16,7 @@ import scala.reflect.ClassTag
 import scala.util.Try
 
 
+//Should just be a trait
 abstract class TemporalGraph[VD: ClassTag, ED: ClassTag] extends Serializable {
   val vertices: VertexRDD[VD]
   val edges: EdgeRDD[ED]
@@ -41,14 +42,8 @@ class SnapshotDelta(val graphs: MutableList[(G, Instant)],
   def backwardsApplyLogs(g: G, logsToApply: RDD[LogTSV]): G = throw new NotImplementedError()
 
   override def snapshotAtTime(instant: Instant): G = {
-    def returnClosestGraph(g1: (G, Instant), g2: (G, Instant)): (G, Instant) = //TODO for tomorrow write tests for this method
-      if (Duration.between(g1._2, instant).abs() <= Duration.between(g2._2, instant).abs()) {
-        g1
-      } else {
-        g2
-      }
 
-    val closestGraph = graphs.reduce(returnClosestGraph)
+    val closestGraph = graphs.reduce(returnClosestGraph(instant))
     println(s"Instant $instant, Closest :graph${closestGraph._2}")
     if (closestGraph._2 == instant) {
       println("You asked for a materialized graph")
@@ -323,6 +318,13 @@ object SnapshotDeltaObject {
       case UPDATE => Some(Edge(edge._1._1, edge._1._2, edge._2.attributes)) // Edge was created and updated
     })
   }
+
+  def returnClosestGraph(instant: Instant)(g1: (G, Instant), g2: (G, Instant)): (G, Instant) =
+    if (Duration.between(g1._2, instant).abs() <= Duration.between(g2._2, instant).abs()) {
+      g1
+    } else {
+      g2
+    }
 
   type G = Graph[Attributes, Attributes]
 
