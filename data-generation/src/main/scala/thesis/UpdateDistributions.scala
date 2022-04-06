@@ -161,7 +161,15 @@ object UpdateDistributions {
     })
     val vertexLogs = vertexIdWithTimestamp.map(vertex => {
       val (id, timestamps) = vertex
-      (id, timestamps.map(LogFactory().generateVertexTSV(id, _)))
+      val logs = {
+        if (timestamps.isEmpty) {
+          List()
+        } else {
+          val create = List(LogFactory().generateVertexTSV(id, timestamps.head).copy(action = CREATE))
+          create ++ timestamps.tail.map(LogFactory().generateVertexTSV(id, _))
+        }
+      }
+      (id, logs)
     }).flatMap(_._2)
 
     val edgeIdWithTimestamp = edges.map(edge => {
@@ -193,7 +201,7 @@ object UpdateDistributions {
     addEdgeUpdateDistribution(sc, g1, CorrelationMode.PositiveCorrelation, LogNormalType(mu, sigma))
   }
 
-  def addGraphUpdateDistribution[VD: ClassTag](graph: Graph[VD, TimeInterval], mode: DistributionType = UniformType(0, 1000))(implicit sc: SparkContext): Graph[Int, IntervalAndUpdateCount] = {
+  def addGraphUpdateDistribution[VD: ClassTag](graph: Graph[VD, TimeInterval], mode: DistributionType = UniformType(0, 10))(implicit sc: SparkContext): Graph[Int, IntervalAndUpdateCount] = {
     getLogger.warn(s"Adding updates with distribution type:$mode")
     val g1 = addVertexUpdateDistribution(sc, graph, CorrelationMode.PositiveCorrelation, mode)
     addEdgeUpdateDistribution(sc, g1, CorrelationMode.PositiveCorrelation, mode)
