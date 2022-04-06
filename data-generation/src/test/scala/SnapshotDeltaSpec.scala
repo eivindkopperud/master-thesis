@@ -12,6 +12,7 @@ import thesis.{LogTSV, SnapshotDeltaObject}
 import utils.TimeUtils._
 import wrappers.SparkTestWrapper
 
+import java.time.Instant
 import scala.collection.immutable.HashMap
 
 class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
@@ -126,22 +127,41 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     }
   }
 
-  "SnapshotAtTime" should "return correct graph given a timestamp" in {
-    implicit val sparkContext: SparkContext = spark.sparkContext
+  implicit def seqToRdd(s: Seq[LogTSV])(implicit sc: SparkContext): RDD[LogTSV] = {
+    sc.parallelize(s)
+  }
 
-    implicit def seqToRdd(s: Seq[LogTSV])(implicit sc: SparkContext): RDD[LogTSV] = {
-      sc.parallelize(s)
-    }
+  "SnapshotAtTime" should "return correct graph given a timestamp close to a snapshot in the past" in {
+    implicit val sparkContext: SparkContext = spark.sparkContext
 
     val updates = List(1, 1, 1, 1, 1, 1, 1) // List of amount of updates for t_1, t_2 .. t_6
     val logs = LogFactory().buildIrregularSequence(updates)
-    println(logs)
     val logRDD = spark.sparkContext.parallelize(logs)
     val snapshotModel = SnapshotDeltaObject.create(logRDD, Time(3))
     val snapshot = snapshotModel.snapshotAtTime(3)
     assertGraphSimilarity(snapshot, createGraph(logs.take(4))) // Take(4) == Instant.ofEpoch(3)
-
-
   }
 
+  it should "return correct graph given a timestamp close to a snapshot in the future" in {
+    implicit val sparkContext: SparkContext = spark.sparkContext
+
+    val updates = List(1, 1, 1, 1, 1, 1, 1) // List of amount of updates for t_1, t_2 .. t_6
+    val logs = LogFactory().buildIrregularSequence(updates)
+    val snapshotModel = SnapshotDeltaObject.create(logs, Time(3))
+    val snapshot = snapshotModel.snapshotAtTime(1)
+    assertGraphSimilarity(snapshot, createGraph(logs.take(2))) // Take(2) == Instant.ofEpoch(1)
+  }
+
+  "returnClosestGraph" should "return the closet graph given an two graphs and an instant" in {
+    implicit val sparkContext: SparkContext = spark.sparkContext
+
+    val vertexLogs1 = LogFactory().buildSingleSequence(5, 1)
+    val vertexLogs2 = LogFactory().buildSingleSequence(5, 2)
+    val earlyGraph = (createGraph(vertexLogs1), 0: Instant)
+    val lateGraph = (createGraph(vertexLogs2), 10: Instant)
+    assertGraphSimilarity(lateGraph._1,
+      SnapshotDeltaObject.returnClosestGraph(6)(earlyGraph, lateGraph)._1)
+    assertGraphSimilarity(earlyGraph._1,
+      SnapshotDeltaObject.returnClosestGraph(1)(earlyGraph, lateGraph)._1)
+  }
 }
