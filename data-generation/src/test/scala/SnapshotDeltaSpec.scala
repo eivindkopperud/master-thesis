@@ -9,7 +9,7 @@ import thesis.Action.{CREATE, DELETE, UPDATE}
 import thesis.Entity.{EDGE, VERTEX}
 import thesis.SnapshotDeltaObject.{applyVertexLogsToSnapshot, createGraph, getSquashedActionsByVertexId, mergeLogTSV}
 import thesis.SnapshotIntervalType.{Count, Time}
-import thesis.{LogTSV, SnapshotDeltaObject}
+import thesis.{LogTSV, Snapshot, SnapshotDeltaObject}
 import utils.TimeUtils._
 import wrappers.SparkTestWrapper
 
@@ -34,7 +34,7 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     val snapshotModel = SnapshotDeltaObject.create(logRDD, Time(2))
     assert(snapshotModel.logs.count() == 4)
     assert(snapshotModel.graphs.length == 3)
-    assertGraphSimilarity(snapshotModel.graphs(0)._1, snapshotModel.graphs(1)._1)
+    assertGraphSimilarity(snapshotModel.graphs(0).graph, snapshotModel.graphs(1).graph)
   }
 
   it can "consist of only one snapshot" in {
@@ -61,8 +61,8 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     val logs = spark.sparkContext.parallelize(logsVertex1 ++ logsVertex2)
     val graphs = SnapshotDeltaObject.create(logs, Count(8))
 
-    assert(graphs.graphs.head._1.vertices.collect().length == 2)
-    assert(graphs.graphs(0)._1.vertices.collect().length == 2)
+    assert(graphs.graphs.head.graph.vertices.collect().length == 2)
+    assert(graphs.graphs(0).graph.vertices.collect().length == 2)
   }
 
   "getSquashedActionsByVertexId" should "squash creates correctly" in {
@@ -159,12 +159,12 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
 
     val vertexLogs1 = LogFactory().buildSingleSequence(VERTEX(1))
     val vertexLogs2 = LogFactory().buildSingleSequence(VERTEX(2))
-    val earlyGraph = (createGraph(vertexLogs1), 0: Instant)
-    val lateGraph = (createGraph(vertexLogs2), 10: Instant)
-    assertGraphSimilarity(lateGraph._1,
-      SnapshotDeltaObject.returnClosestGraph(6)(earlyGraph, lateGraph)._1)
-    assertGraphSimilarity(earlyGraph._1,
-      SnapshotDeltaObject.returnClosestGraph(1)(earlyGraph, lateGraph)._1)
+    val earlyGraph = Snapshot(createGraph(vertexLogs1), 0: Instant)
+    val lateGraph = Snapshot(createGraph(vertexLogs2), 10: Instant)
+    assertGraphSimilarity(lateGraph.graph,
+      SnapshotDeltaObject.returnClosestGraph(6)(earlyGraph, lateGraph).graph)
+    assertGraphSimilarity(earlyGraph.graph,
+      SnapshotDeltaObject.returnClosestGraph(1)(earlyGraph, lateGraph).graph)
   }
 
   "applyVertexLogsToSnapshot" should "apply vertex logs correctly to the given snapshot" in {
