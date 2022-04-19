@@ -25,12 +25,12 @@ abstract class TemporalGraph[VD: ClassTag, ED: ClassTag] extends Serializable {
   def snapshotAtTime(instant: Instant): Graph[VD, ED]
 }
 
-class SnapshotDelta(val graphs: MutableList[(G, Instant)],
+class SnapshotDelta(val graphs: MutableList[Snapshot],
                     val logs: RDD[LogTSV],
                     val snapshotType: SnapshotIntervalType) extends TemporalGraph[Attributes, Attributes] { // extends Graph[VD, ED] {
-  override val vertices: VertexRDD[Attributes] = graphs.get(0).get._1.vertices
-  override val edges: EdgeRDD[Attributes] = graphs.get(0).get._1.edges
-  override val triplets: RDD[EdgeTriplet[Attributes, Attributes]] = graphs.get(0).get._1.triplets
+  override val vertices: VertexRDD[Attributes] = graphs.get(0).get.graph.vertices
+  override val edges: EdgeRDD[Attributes] = graphs.get(0).get.graph.edges
+  override val triplets: RDD[EdgeTriplet[Attributes, Attributes]] = graphs.get(0).get.graph.triplets
 
   def forwardApplyLogs(graph: G, logsToApply: RDD[LogTSV]): G = {
     Graph(
@@ -44,16 +44,16 @@ class SnapshotDelta(val graphs: MutableList[(G, Instant)],
   override def snapshotAtTime(instant: Instant): G = {
 
     val closestGraph = graphs.reduce(returnClosestGraph(instant))
-    println(s"Instant $instant, Closest :graph${closestGraph._2}")
-    if (closestGraph._2 == instant) {
+    println(s"Instant $instant, Closest :graph${closestGraph.instant}")
+    if (closestGraph.instant == instant) {
       println("You asked for a materialized graph")
-      closestGraph._1
-    } else if (closestGraph._2.isBefore(instant)) {
-      val logsToApply = logs.map(l => (l.timestamp, l)).filterByRange(closestGraph._2, instant).map(_._2)
-      forwardApplyLogs(closestGraph._1, logsToApply)
+      closestGraph.graph
+    } else if (closestGraph.instant.isBefore(instant)) {
+      val logsToApply = logs.map(l => (l.timestamp, l)).filterByRange(closestGraph.instant, instant).map(_._2)
+      forwardApplyLogs(closestGraph.graph, logsToApply)
     } else {
-      val logsToApply = logs.map(l => (l.timestamp, l)).filterByRange(instant, closestGraph._2).map(_._2)
-      backwardsApplyLogs(closestGraph._1, logsToApply)
+      val logsToApply = logs.map(l => (l.timestamp, l)).filterByRange(instant, closestGraph.instant).map(_._2)
+      backwardsApplyLogs(closestGraph.graph, logsToApply)
     }
   }
 
@@ -106,6 +106,8 @@ object SnapshotIntervalType {
   final case class Count(numberOfActions: Int) extends SnapshotIntervalType
 }
 
+final case class Snapshot(graph: G, instant: Instant)
+
 object SnapshotDeltaObject {
   def getLogger: Logger = LoggerFactory.getLogger("SnapShotDeltaObject")
 
@@ -140,7 +142,7 @@ object SnapshotDeltaObject {
     val initLogs = logsWithSortableKey.filterByRange(min, interval).map(_._2)
     val initTimestamp = initLogs.map(_.timestamp).max()
     val initialGraph = createGraph(initLogs)
-    val graphs = MutableList((initialGraph, initTimestamp))
+    val graphs = MutableList(Snapshot(initialGraph, initTimestamp))
 
     for (i <- 1 until numberOfSnapShots) {
       val previousSnapshot = graphs(i - 1)
@@ -150,13 +152,13 @@ object SnapshotDeltaObject {
         .filterByRange(min + (interval * i), min + (interval * (i + 1)) - 1) // This lets ut get a slice of the LTSVs (filterByRange is inclusive)
         .map(_._2) // This maps the type into back to its original form
 
-      val newVertices = applyVertexLogsToSnapshot(previousSnapshot._1, logInterval)
-      val newEdges = applyEdgeLogsToSnapshot(previousSnapshot._1, logInterval)
+      val newVertices = applyVertexLogsToSnapshot(previousSnapshot.graph, logInterval)
+      val newEdges = applyEdgeLogsToSnapshot(previousSnapshot.graph, logInterval)
 
       val graphTimestamp = Try {
         logInterval.map(_.timestamp).max()
       }.getOrElse(Instant.ofEpochSecond(min + (interval * i + 1) - 1)) //TODO write test to make sure the timestamps are correct
-      val newGraphWithTimestamp = (Graph(newVertices, newEdges), graphTimestamp)
+      val newGraphWithTimestamp = Snapshot(Graph(newVertices, newEdges), graphTimestamp)
       graphs += newGraphWithTimestamp
     }
     new SnapshotDelta(graphs, logsWithSortableKey.map(_._2), snapshotIntervalType)
@@ -320,11 +322,11 @@ object SnapshotDeltaObject {
     })
   }
 
-  def returnClosestGraph(instant: Instant)(g1: (G, Instant), g2: (G, Instant)): (G, Instant) =
-    if (Duration.between(g1._2, instant).abs() <= Duration.between(g2._2, instant).abs()) {
-      g1
+  def returnClosestGraph(instant: Instant)(snapshot1: Snapshot, snapshot2: Snapshot): Snapshot =
+    if (Duration.between(snapshot1.instant, instant).abs() <= Duration.between(snapshot2.instant, instant).abs()) {
+      snapshot1
     } else {
-      g2
+      snapshot2
     }
 
   type G = Graph[Attributes, Attributes]
