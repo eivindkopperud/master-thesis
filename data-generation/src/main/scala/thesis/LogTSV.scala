@@ -158,7 +158,21 @@ object LTSV {
     pw.close()
   }
 
-  def readFromFile(filename: String="logs.tsv"): List[LogTSV] = {
+  /**
+   * Ever wanted to just persist your RDDs of LogTSVs?
+   * With this implicit class we add a method to the RDD[LogTSV] class
+   * logRDD.serializeLogs() is now possible instead of serializeLogs(logRDDs)
+   *
+   * @param logs the logs
+   */
+  implicit class RDDLogTSVMethod(logs: RDD[LogTSV]) {
+
+    def serializeLogs(filename: String = "logs.tsv"): Unit = {
+      writeToFile(logs.collect().toList, filename)
+    }
+  }
+
+  def readFromFile(filename: String = "logs.tsv"): List[LogTSV] = {
     val f = Source.fromFile(filename)
     val list = deserializeList(f.mkString)
     f.close()
