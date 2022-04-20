@@ -8,7 +8,7 @@ import thesis.Action.{CREATE, DELETE, UPDATE}
 import thesis.DataTypes.{AttributeGraph, Attributes, EdgeId}
 import thesis.Entity.{EDGE, VERTEX}
 import thesis.SnapshotDeltaObject._
-
+import utils.LogUtils
 import java.time.{Duration, Instant}
 import scala.collection.mutable.MutableList
 import scala.math.Ordered.orderingToOrdered
@@ -184,17 +184,10 @@ object SnapshotDeltaObject {
     }
   }
 
-  def getSquashedActionsByEdgeId(logs: RDD[LogTSV]): RDD[(EdgeId, LogTSV)] = {
-    // Filter out vertex actions
-    val edgeIdWithEdgeActions = logs.flatMap(log => log.entity match {
-      case _: VERTEX => None
-      case EDGE(id, _, _) => Some(id, log)
-    })
-
-    // Group by edge id and merge
-    edgeIdWithEdgeActions
-      .groupByKey()
+  def getSquashedActionsByEdgeId(logs: RDD[LogTSV]): RDD[(Long, LogTSV)] = {
+    LogUtils.getEdgeLogsById(logs)
       .map(edgeWithActions => (edgeWithActions._1, mergeLogTSVs(edgeWithActions._2)))
+
   }
 
   def applyVertexLogsToSnapshot(snapshot: AttributeGraph, logs: RDD[LogTSV]): RDD[(VertexId, Attributes)] = {
@@ -228,14 +221,7 @@ object SnapshotDeltaObject {
   }
 
   def getSquashedActionsByVertexId(logs: RDD[LogTSV]): RDD[(Long, LogTSV)] = {
-    // Filter out edge actions
-    val vertexIdWithVertexActions = logs.flatMap(log => log.entity match {
-      case VERTEX(objId) => Some(objId, log)
-      case _: EDGE => None
-    })
-
-    // Group by vertex id and merge
-    vertexIdWithVertexActions.groupByKey()
+    LogUtils.getVertexLogsById(logs)
       .map(vertexWithActions => (vertexWithActions._1, mergeLogTSVs(vertexWithActions._2)))
   }
 

@@ -50,11 +50,13 @@ object PossibleWorkFlow {
     println(s"Number of logs ${logs.count()}")
 
     //TODO generate Landy Model
-
-
+    val landyModel = LandyConsumer.consume(logs)
     //TODO benchmark queries
     val graphAtTime = snapshotModel.snapshotAtTime(2012)
     println(s"Graph at time 2012 has ${graphAtTime.vertices.count()} vertices and ${graphAtTime.edges.count()} edges")
+
+    val graphAtTimeLandy = landyModel.snapshotAtTime(2013)
+    println(s"Graph at time 2012 has ${graphAtTimeLandy.vertices.count()} vertices and ${graphAtTimeLandy.edges.count()} edges")
 
     // Timing of whole process
     val end = System.nanoTime()
