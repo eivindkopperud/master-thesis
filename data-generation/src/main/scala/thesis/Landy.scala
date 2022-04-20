@@ -7,6 +7,10 @@ import thesis.SnapshotDeltaObject.G
 
 import java.time.Instant
 
+final case class InvalidTimeSchemaError(
+                                         private val message: String = "All Landy objects should have validFrom and validTo as attributes.",
+                                         private val cause: Throwable = None.orNull
+                                       ) extends IllegalStateException(message, cause)
 
 class Landy(val graph: G) extends TemporalGraph[Attributes, Attributes] {
   override val vertices: VertexRDD[Attributes] = graph.vertices
@@ -16,12 +20,12 @@ class Landy(val graph: G) extends TemporalGraph[Attributes, Attributes] {
   override def snapshotAtTime(instant: Instant): Graph[Attributes, Attributes] = {
     val vertices = this.vertices.filter(vertex => (vertex._2.get("validFrom"), vertex._2.get("validTo")) match {
       case (Some(validFrom), Some(validTo)) => Instant.parse(validFrom).isBefore(instant) && (Instant.parse(validTo).isBefore(instant) || Instant.parse(validTo).equals(instant))
-      case _ => throw new IllegalStateException("All Landy objects should have validFrom and validTo as attributes.")
+      case _ => throw new InvalidTimeSchemaError
     })
 
     val edges = this.edges.filter(edge => (edge.attr.get("validFrom"), edge.attr.get("validTo")) match {
       case (Some(validFrom), Some(validTo)) => Instant.parse(validFrom).isBefore(instant) && (Instant.parse(validTo).isBefore(instant) || Instant.parse(validTo).equals(instant))
-      case _ => throw new IllegalStateException("All Landy objects should have validFrom and validTo as attributes.")
+      case _ => throw new InvalidTimeSchemaError
     })
 
     Graph(vertices, edges)
