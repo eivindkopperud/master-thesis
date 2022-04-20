@@ -7,7 +7,7 @@ import org.slf4j.{Logger, LoggerFactory}
 import thesis.Action.{CREATE, DELETE, UPDATE}
 import thesis.Entity.{EDGE, VERTEX}
 import thesis.LTSV.Attributes
-import thesis.SnapshotDeltaObject.{G, applyEdgeLogsToSnapshot, applyVertexLogsToSnapshot, returnClosestGraph}
+import thesis.SnapshotDeltaObject._
 
 import java.time.{Duration, Instant}
 import scala.collection.mutable.MutableList
@@ -142,7 +142,7 @@ object SnapshotDeltaObject {
       case SnapshotIntervalType.Count(number) => ((logsWithSortableKey.count().toFloat / number).ceil.toInt, number) // .count() should in _theory_ be the same as 'max'. So these two lines could in theory be identical
     }
 
-    val initLogs = logsWithSortableKey.filterByRange(min, interval).map(_._2)
+    val initLogs = logsWithSortableKey.filterByRange(min, interval - 1).map(_._2)
     val initTimestamp = initLogs.map(_.timestamp).max()
     val initialGraph = createGraph(initLogs)
     val graphs = MutableList(Snapshot(initialGraph, initTimestamp))
@@ -217,7 +217,6 @@ object SnapshotDeltaObject {
     val previousSnapshotVertices = snapshot.vertices
 
     val vertexIDsWithAction: RDD[(Long, LogTSV)] = getSquashedActionsByVertexId(logs)
-    println(s"applyVertexLogsToSnapShot ${vertexIDsWithAction.collect().mkString("Array(", ", ", ")")}")
 
     // Combine vertices from the snapshot with the current log interval
     val joinedVertices = previousSnapshotVertices.fullOuterJoin(vertexIDsWithAction)
