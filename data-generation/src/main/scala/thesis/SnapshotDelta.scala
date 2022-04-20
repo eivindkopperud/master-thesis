@@ -31,6 +31,7 @@ class SnapshotDelta(val graphs: MutableList[Snapshot],
   override val vertices: VertexRDD[Attributes] = graphs.get(0).get.graph.vertices
   override val edges: EdgeRDD[Attributes] = graphs.get(0).get.graph.edges
   override val triplets: RDD[EdgeTriplet[Attributes, Attributes]] = graphs.get(0).get.graph.triplets
+  val logger: Logger = getLogger
 
   def forwardApplyLogs(graph: G, logsToApply: RDD[LogTSV]): G = {
     Graph(
@@ -44,14 +45,16 @@ class SnapshotDelta(val graphs: MutableList[Snapshot],
   override def snapshotAtTime(instant: Instant): G = {
 
     val closestGraph = graphs.reduce(returnClosestGraph(instant))
-    println(s"Instant $instant, Closest :graph${closestGraph.instant}")
+    logger.warn(s"Instant $instant, Closest :graph${closestGraph.instant}")
     if (closestGraph.instant == instant) {
-      println("You asked for a materialized graph")
+      logger.warn("The queried graph is already materialized")
       closestGraph.graph
     } else if (closestGraph.instant.isBefore(instant)) {
+      logger.warn("Closest graph is in the future. Need to apply logs forwards")
       val logsToApply = logs.map(l => (l.timestamp, l)).filterByRange(closestGraph.instant, instant).map(_._2)
       forwardApplyLogs(closestGraph.graph, logsToApply)
     } else {
+      logger.warn("Closest graph is in the past. Need to apply logs backwards")
       val logsToApply = logs.map(l => (l.timestamp, l)).filterByRange(instant, closestGraph.instant).map(_._2)
       backwardsApplyLogs(closestGraph.graph, logsToApply)
     }
@@ -109,7 +112,7 @@ object SnapshotIntervalType {
 final case class Snapshot(graph: G, instant: Instant)
 
 object SnapshotDeltaObject {
-  def getLogger: Logger = LoggerFactory.getLogger("SnapShotDeltaObject")
+  def getLogger: Logger = LoggerFactory.getLogger("SnapShotDelta")
 
   def create[VD, ED](logs: RDD[LogTSV], snapType: SnapshotIntervalType): SnapshotDelta = {
     snapType match {
@@ -165,7 +168,8 @@ object SnapshotDeltaObject {
   }
 
   def applyEdgeLogsToSnapshot(snapshot: Graph[LTSV.Attributes, LTSV.Attributes], logs: RDD[LogTSV]): RDD[Edge[Attributes]] = {
-    val previousSnapshotEdgesKV = snapshot.edges.map(edge => ((edge.dstId, edge.srcId), edge.attr))
+    val uuid = java.util.UUID.randomUUID.toString.take(5)
+    val previousSnapshotEdgesKV = snapshot.edges.map(edge => ((edge.srcId, edge.dstId), edge.attr))
 
     val squashedEdgeActions = getSquashedActionsByEdgeId(logs)
 
@@ -181,14 +185,14 @@ object SnapshotDeltaObject {
         case UPDATE => // Edge updated in this interval
           Some(Edge(outerJoinedEdge._1._1, outerJoinedEdge._1._2, rightWayMergeHashMap(previousEdge, newEdgeAction.attributes)))
         case CREATE =>
-          throw new IllegalStateException("An CREATE should never happen since this case should be an action referencing an existing entity")
+          throw new IllegalStateException(s"$uuid An CREATE should never happen since this case should be an action referencing an existing entity")
       }
       case (None, Some(newEdgeAction)) => newEdgeAction.action match { // Edge was introduced in this interval
         case DELETE => None // Edge was introduced then promptly deleted (possibly due to a deleted vertex)
         case CREATE => // Edge was created
           Some(Edge(outerJoinedEdge._1._1, outerJoinedEdge._1._2, newEdgeAction.attributes))
         case UPDATE =>
-          throw new IllegalStateException("An UPDATE should never happen if it's new because of how merging of LogTSVs are done")
+          throw new IllegalStateException(s"$uuid An UPDATE should never happen if it's new because of how merging of LogTSVs are done $newEdgeAction")
       }
     })
     newSnapshotEdges
@@ -208,6 +212,8 @@ object SnapshotDeltaObject {
   }
 
   def applyVertexLogsToSnapshot(snapshot: Graph[LTSV.Attributes, LTSV.Attributes], logs: RDD[LogTSV]): RDD[(VertexId, Attributes)] = {
+    val uuid = java.util.UUID.randomUUID.toString.take(5)
+
     val previousSnapshotVertices = snapshot.vertices
 
     val vertexIDsWithAction: RDD[(Long, LogTSV)] = getSquashedActionsByVertexId(logs)
@@ -224,14 +230,14 @@ object SnapshotDeltaObject {
         case DELETE => None // Vertex was deleted
         case UPDATE => // Vertex was updated
           Some((outerJoinedVertex._1, rightWayMergeHashMap(snapshotVertex, newVertex.attributes)))
-        case CREATE => throw new IllegalStateException(s"An CREATE should never happen since this case should be an action referencing an existing entity: $snapshotVertex $newVertex")
+        case CREATE => throw new IllegalStateException(s"$uuid An CREATE should never happen since this case should be an action referencing an existing vertex: $snapshotVertex $newVertex ")
       }
       case (None, Some(newVertex)) => newVertex.action match { // Vertex was introduced in this interval
         case DELETE => None // Vertex was introduced then promptly deleted
         case CREATE => // Vertex was created
           Some((outerJoinedVertex._1, newVertex.attributes))
         case UPDATE =>
-          throw new IllegalStateException(s"An UPDATE should never happen if the vertex is new in the interval, because of the way merging og LogTSVs are done: Vertex $newVertex")
+          throw new IllegalStateException(s"$uuid An UPDATE should never happen if the vertex is new in the interval, because of the way merging og LogTSVs are done: Vertex $newVertex")
       }
     })
     newSnapshotVertices
@@ -297,7 +303,7 @@ object SnapshotDeltaObject {
    * @return new Graph
    */
   def createGraph(logs: RDD[LogTSV]): Graph[Attributes, Attributes] = {
-    getLogger.warn("Creating graph from RDD[LogTSV]")
+    getLogger.warn("Creating (most likely) initial graph from RDD[LogTSV]")
     val firstSnapshotVertices = getInitialVerticesFromLogs(logs)
     val firstSnapshotEdges = getInitialEdgesFromLogs(logs)
 
