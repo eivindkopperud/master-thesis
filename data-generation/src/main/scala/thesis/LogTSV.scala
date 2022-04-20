@@ -1,8 +1,10 @@
 package thesis
 
-import Action.{CREATE, DELETE, UPDATE}
-import Entity.{EDGE, VERTEX}
-import LTSV.Attributes
+import org.apache.spark.rdd.RDD
+import thesis.Action.{CREATE, DELETE, UPDATE}
+import thesis.Entity.{EDGE, VERTEX}
+import thesis.LTSV.Attributes
+
 import java.time.{Instant, LocalDateTime, ZoneOffset}
 import scala.collection.immutable
 import scala.io.Source
@@ -12,30 +14,37 @@ import scala.util.Try
  *
  */
 sealed abstract class Action
-object Action{
+
+object Action {
   final case object CREATE extends Action
+
   final case object UPDATE extends Action
+
   final case object DELETE extends Action
 }
+
 sealed abstract class Entity
+
 object Entity {
   final case class VERTEX(objId: Long) extends Entity
+
   final case class EDGE(srcId: Long, dstId: Long) extends Entity
 }
 
 /** LogTSV
  *
  * Everything is built around this case class
- * @param timestamp When did the log_entry happen?
- * @param action Type of action
- * @param entity The type of the object with id(s)
+ *
+ * @param timestamp  When did the log_entry happen?
+ * @param action     Type of action
+ * @param entity     The type of the object with id(s)
  * @param attributes List of (Key,Value) attributes relevant to the entry
  */
 case class LogTSV(
-                 timestamp : Instant,
-                 action : Action,
-                 entity: Entity,
-                 attributes: Attributes
+                   timestamp: Instant,
+                   action: Action,
+                   entity: Entity,
+                   attributes: Attributes
                  )
 
 
@@ -74,9 +83,10 @@ object LTSV {
   }
 
   def serializeList(entries: List[LogTSV]): String = entries.map(serializeLTSV).mkString("\n")
+
   def deserializeList(entries: String): List[LogTSV] = entries.split("\n").flatMap(deserializeLTSV).toList
 
-  /**  Deserialize a single LogTSV
+  /** Deserialize a single LogTSV
    *
    * All the variables with 'serialized' prefix return an Option type.
    * If any return a None the whole block returns a None.
@@ -90,9 +100,11 @@ object LTSV {
   def deserializeLTSV(logEntry: String): Option[LogTSV] = {
     // This line could fail, but its a hassle to make safe
     // Destructures the first three items, and 'attributes' is the tail
-    val timestamp::action::entity::attributes : List[String] = logEntry.split('\t').toList
+    val timestamp :: action :: entity :: attributes: List[String] = logEntry.split('\t').toList
     for {
-      deserializedTimestamp <- Try {Instant.parse(timestamp)}.toOption
+      deserializedTimestamp <- Try {
+        Instant.parse(timestamp)
+      }.toOption
       deserializedAction <- action match {
         case "CREATE" => Some(CREATE)
         case "UPDATE" => Some(UPDATE)
@@ -114,7 +126,7 @@ object LTSV {
    *
    */
   def serializeAttributes(attributes: Attributes): String = {
-    val noTabsOrColon = (x:Char) => x != '\t' && x != ':'
+    val noTabsOrColon = (x: Char) => x != '\t' && x != ':'
     attributes.map(
       tup => s"${tup._1.filter(noTabsOrColon)}:${tup._2.filter(noTabsOrColon)}"
     ).mkString("\t")
@@ -132,19 +144,19 @@ object LTSV {
         case key :: value :: Nil => Some(key, value)
         case _ => None
       }
-    if (attributeTuples.forall(_.isDefined)){ // Did everything parse correctly?
-      val immutableHashMap = immutable.HashMap[String, String](attributeTuples.flatten:_*)
+    if (attributeTuples.forall(_.isDefined)) { // Did everything parse correctly?
+      val immutableHashMap = immutable.HashMap[String, String](attributeTuples.flatten: _*)
       Some(immutableHashMap)
     } else {
       None
     }
   }
 
-   def writeToFile(entries: List[LogTSV], filename: String="logs.tsv"): Unit = {
-     val pw = new java.io.PrintWriter(filename)
-     pw.write(serializeList(entries))
-     pw.close()
-   }
+  def writeToFile(entries: List[LogTSV], filename: String = "logs.tsv"): Unit = {
+    val pw = new java.io.PrintWriter(filename)
+    pw.write(serializeList(entries))
+    pw.close()
+  }
 
   def readFromFile(filename: String="logs.tsv"): List[LogTSV] = {
     val f = Source.fromFile(filename)
