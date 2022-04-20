@@ -56,11 +56,18 @@ class LandySpec extends AnyFlatSpec with SparkTestWrapper {
 
   "Landy" can "be created" in {
     val landy: Landy = new Landy(createGraph())
+
+    assert(landy.vertices.count() == 3)
+    assert(landy.edges.count() == 2)
+  }
+
+  it can "give a snapshot" in {
+    val landy: Landy = new Landy(createGraph())
     val instant = Instant.parse(t2)
+
     val graph = landy.snapshotAtTime(instant)
 
     assert(graph.vertices.count() == 2)
     assert(graph.edges.count() == 1)
   }
-
 }
