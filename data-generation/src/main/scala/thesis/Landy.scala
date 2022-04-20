@@ -14,16 +14,18 @@ class Landy(val graph: G) extends TemporalGraph[Attributes, Attributes] {
   override val triplets: RDD[EdgeTriplet[Attributes, Attributes]] = graph.triplets
 
   override def snapshotAtTime(instant: Instant): Graph[Attributes, Attributes] = {
-    val vertices = this.vertices.filter(vertex => (vertex._2.get("timeFrom"), vertex._2.get("timeTo")) match {
-      case (Some(timeFrom), Some(timeTo)) => Instant.parse(timeFrom).isBefore(instant) && Instant.parse(timeTo).isBefore(instant)
-      case _ => throw new IllegalStateException("All Landy objects should have timeFrom and timeTo as attributes.")
+    val vertices = this.vertices.filter(vertex => (vertex._2.get("validFrom"), vertex._2.get("validTo")) match {
+      case (Some(validFrom), Some(validTo)) => Instant.parse(validFrom).isBefore(instant) && (Instant.parse(validTo).isBefore(instant) || Instant.parse(validTo).equals(instant))
+      case _ => throw new IllegalStateException("All Landy objects should have validFrom and validTo as attributes.")
     })
 
-    val edges = this.edges.filter(edge => (edge.attr.get("timeFrom"), edge.attr.get("timeTo")) match {
-      case (Some(timeFrom), Some(timeTo)) => Instant.parse(timeFrom).isBefore(instant) && Instant.parse(timeTo).isBefore(instant)
-      case _ => throw new IllegalStateException("All Landy objects should have timeFrom and timeTo as attributes.")
+    val edges = this.edges.filter(edge => (edge.attr.get("validFrom"), edge.attr.get("validTo")) match {
+      case (Some(validFrom), Some(validTo)) => Instant.parse(validFrom).isBefore(instant) && (Instant.parse(validTo).isBefore(instant) || Instant.parse(validTo).equals(instant))
+      case _ => throw new IllegalStateException("All Landy objects should have validFrom and validTo as attributes.")
     })
 
     Graph(vertices, edges)
   }
 }
+
+
