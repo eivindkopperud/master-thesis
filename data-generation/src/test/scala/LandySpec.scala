@@ -2,7 +2,7 @@ import org.apache.spark.graphx.{Edge, Graph, VertexRDD}
 import thesis.Landy
 import org.scalatest.flatspec.AnyFlatSpec
 import thesis.LTSV.Attributes
-import thesis.SnapshotDeltaObject.G
+import thesis.SnapshotDeltaObject.AttributeGraph
 import wrappers.SparkTestWrapper
 
 import java.time.Instant
@@ -10,7 +10,7 @@ import scala.collection.immutable.HashMap
 
 class LandySpec extends AnyFlatSpec with SparkTestWrapper {
 
-  def createGraph(): G = {
+  def createGraph(): AttributeGraph = {
     val vertices = spark.sparkContext.parallelize(getVertices)
     val edges = spark.sparkContext.parallelize(getEdges)
     Graph(vertices, edges)
@@ -24,17 +24,21 @@ class LandySpec extends AnyFlatSpec with SparkTestWrapper {
       (1L, HashMap(
         "validFrom"->t1,
         "validTo"->t2,
-        "color"->"red")
+        "color"->"red",
+        "vertexId"->"1"
+      )
       ),
       (2L, HashMap(
         "validFrom"->t2,
         "validTo"->t3,
-        "color"->"blue"
+        "color"->"blue",
+        "vertexId"->"1"
       )),
       (3L, HashMap(
         "validFrom"->t1,
         "validTo"->t3,
-        "color"->"orange"
+        "color"->"orange",
+        "vertexId"->"2"
       ))
     )
   }
