@@ -282,20 +282,6 @@ object SnapshotDeltaObject {
     attributes.merged(dominantAttributes)((_, y) => y)
   }
 
-  def getEdgeIds(log: LogTSV): Option[(Long, Long)] = {
-    log.entity match {
-      case VERTEX(_) => None
-      case EDGE(srcId, dstId) => Some(srcId, dstId)
-    }
-  }
-
-  def getVertexIds(log: LogTSV): Option[Long] = {
-    log.entity match {
-      case VERTEX(objId) => Some(objId)
-      case EDGE(_, _) => None
-    }
-  }
-
   /** Create graph from an initial list of LogTSVs
    *
    * @param logs Initial log entries
