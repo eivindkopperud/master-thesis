@@ -300,7 +300,8 @@ object SnapshotDeltaObject {
     verticesWithAction.flatMap(vertexTuple => vertexTuple._2.action match {
       case CREATE => Some(vertexTuple._1, vertexTuple._2.attributes) // Vertex was created
       case DELETE => None // Vertex was created and deleted
-      case UPDATE => Some(vertexTuple._1, vertexTuple._2.attributes) // Vertex was created and updated
+      case UPDATE => throw new IllegalStateException("This should never happen based on the way we do merging")
+      // This last case UPDATE should never happen because of the way we do merging?
     })
   }
 
@@ -309,7 +310,8 @@ object SnapshotDeltaObject {
     edgesWithAction.flatMap(edge => edge._2.action match {
       case CREATE => Some(Edge(edge._1._1, edge._1._2, edge._2.attributes)) // Edge was created
       case DELETE => None // Edge was created and deleted (Possibly because of a deleted vertex)
-      case UPDATE => Some(Edge(edge._1._1, edge._1._2, edge._2.attributes)) // Edge was created and updated
+      case UPDATE => throw new IllegalStateException("This should never happen based on the way we do merging")
+      // This last case UPDATE should never happen because of the way we do merging?
     })
   }
 
