@@ -9,6 +9,7 @@ import org.apache.spark.rdd.RDD
 import org.slf4j.{Logger, LoggerFactory}
 import thesis.Action.{CREATE, DELETE}
 import thesis.DistributionType.{LogNormalType, UniformType}
+import thesis.Entity.EDGE
 
 import java.nio.file.{Files, Paths}
 import scala.reflect.ClassTag
@@ -152,6 +153,15 @@ object UpdateDistributions {
   private def getSortedUniformDistribution(low: Double, high: Double, numSamples: Int): List[Long] =
     Uniform(low, high).sample(numSamples).map(_.toLong).toList.sorted
 
+  //For example, the number of random version-4 UUIDs which need to be generated
+  // in order to have a 50% probability of at least one collision is 2.71 quintillion
+  // This number is equivalent to generating 1 billion UUIDs per second for about 85 years.
+  // from https://en.wikipedia.org/wiki/Universally_unique_identifier#Collisions
+  // Using getLeastSignificantBits we half that 128bit space to 64. So in my head
+  // you can find a collision after 85/2 years.
+  // After our discussion it will not be 85/2 years but something else
+  def uuid: Long = java.util.UUID.randomUUID.getLeastSignificantBits & Long.MaxValue
+
   def generateLogs(graph: Graph[Int, IntervalAndUpdateCount]): RDD[LogTSV] = {
     val (vertices, edges) = (graph.vertices, graph.edges)
     val vertexIdWithTimestamp = vertices.map(vertex => {
@@ -174,7 +184,7 @@ object UpdateDistributions {
 
     val edgeIdWithTimestamp = edges.map(edge => {
       val distribution = getSortedUniformDistribution(edge.attr.interval.start.getEpochSecond, edge.attr.interval.stop.getEpochSecond, edge.attr.count)
-      ((edge.srcId, edge.dstId), (edge.attr.interval, distribution))
+      (EDGE(uuid, edge.srcId, edge.dstId), (edge.attr.interval, distribution)) // Add Surrogate key
     })
     val edgeLogs = edgeIdWithTimestamp.map(edge => {
       val (ids, (interval, timestamps)) = edge

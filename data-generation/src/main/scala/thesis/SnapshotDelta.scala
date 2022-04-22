@@ -6,7 +6,7 @@ import org.apache.spark.rdd.RDD.rddToOrderedRDDFunctions
 import org.slf4j.{Logger, LoggerFactory}
 import thesis.Action.{CREATE, DELETE, UPDATE}
 import thesis.Entity.{EDGE, VERTEX}
-import thesis.LTSV.Attributes
+import thesis.LTSV.{Attributes, EdgeId}
 import thesis.SnapshotDeltaObject._
 
 import java.time.{Duration, Instant}
@@ -27,10 +27,10 @@ abstract class TemporalGraph[VD: ClassTag, ED: ClassTag] extends Serializable {
 
 class SnapshotDelta(val graphs: MutableList[Snapshot],
                     val logs: RDD[LogTSV],
-                    val snapshotType: SnapshotIntervalType) extends TemporalGraph[Attributes, Attributes] { // extends Graph[VD, ED] {
+                    val snapshotType: SnapshotIntervalType) extends TemporalGraph[Attributes, (EdgeId, Attributes)] {
   override val vertices: VertexRDD[Attributes] = graphs.get(0).get.graph.vertices
-  override val edges: EdgeRDD[Attributes] = graphs.get(0).get.graph.edges
-  override val triplets: RDD[EdgeTriplet[Attributes, Attributes]] = graphs.get(0).get.graph.triplets
+  override val edges: EdgeRDD[(EdgeId, Attributes)] = graphs.get(0).get.graph.edges
+  override val triplets: RDD[EdgeTriplet[Attributes, (EdgeId, Attributes)]] = graphs.get(0).get.graph.triplets
   val logger: Logger = getLogger
 
   def forwardApplyLogs(graph: AttributeGraph, logsToApply: RDD[LogTSV]): AttributeGraph = {
@@ -167,9 +167,9 @@ object SnapshotDeltaObject {
     new SnapshotDelta(graphs, logsWithSortableKey.map(_._2), snapshotIntervalType)
   }
 
-  def applyEdgeLogsToSnapshot(snapshot: Graph[LTSV.Attributes, LTSV.Attributes], logs: RDD[LogTSV]): RDD[Edge[Attributes]] = {
+  def applyEdgeLogsToSnapshot(snapshot: AttributeGraph, logs: RDD[LogTSV]): RDD[Edge[(EdgeId, Attributes)]] = {
     val uuid = java.util.UUID.randomUUID.toString.take(5)
-    val previousSnapshotEdgesKV = snapshot.edges.map(edge => ((edge.srcId, edge.dstId), edge.attr))
+    val previousSnapshotEdgesKV = snapshot.edges.map(edge => (edge.attr._1, edge))
 
     val squashedEdgeActions = getSquashedActionsByEdgeId(logs)
 
@@ -177,20 +177,20 @@ object SnapshotDeltaObject {
     val joinedEdges = previousSnapshotEdgesKV.fullOuterJoin(squashedEdgeActions)
 
     // Create, update or omit (delete) edges based on values are present or not.
-    val newSnapshotEdges = joinedEdges.flatMap(outerJoinedEdge => outerJoinedEdge._2 match {
+    val newSnapshotEdges: RDD[Edge[(EdgeId, LTSV.Attributes)]] = joinedEdges.flatMap(outerJoinedEdge => outerJoinedEdge._2 match {
       case (None, None) => throw new IllegalStateException("The full outer join f*ucked up")
-      case (Some(previousEdge), None) => Some(Edge(outerJoinedEdge._1._1, outerJoinedEdge._1._2, previousEdge)) // Edge existed in the last snapshot, but no changes were done in this interval
+      case (Some(previousEdge), None) => Some(Edge(previousEdge.srcId, previousEdge.dstId, previousEdge.attr)) // Edge existed in the last snapshot, but no changes were done in this interval
       case (Some(previousEdge), Some(newEdgeAction)) => newEdgeAction.action match { // There has been a change to the edge in the interval
         case DELETE => None // Edge or {source,destination} vertex was deleted in the new interval
         case UPDATE => // Edge updated in this interval
-          Some(Edge(outerJoinedEdge._1._1, outerJoinedEdge._1._2, rightWayMergeHashMap(previousEdge, newEdgeAction.attributes)))
+          Some(previousEdge.copy(attr = (previousEdge.attr._1, rightWayMergeHashMap(previousEdge.attr._2, newEdgeAction.attributes))))
         case CREATE =>
           throw new IllegalStateException(s"$uuid An CREATE should never happen since this case should be an action referencing an existing entity")
       }
       case (None, Some(newEdgeAction)) => newEdgeAction.action match { // Edge was introduced in this interval
         case DELETE => None // Edge was introduced then promptly deleted (possibly due to a deleted vertex)
         case CREATE => // Edge was created
-          Some(Edge(outerJoinedEdge._1._1, outerJoinedEdge._1._2, newEdgeAction.attributes))
+          Some(logToEdge(newEdgeAction))
         case UPDATE =>
           throw new IllegalStateException(s"$uuid An UPDATE should never happen if it's new because of how merging of LogTSVs are done $newEdgeAction")
       }
@@ -198,12 +198,18 @@ object SnapshotDeltaObject {
     newSnapshotEdges
   }
 
-  // We are making the assumption that there can only be one edge between two nodes. We might have to create a surrogate key
-  def getSquashedActionsByEdgeId(logs: RDD[LogTSV]): RDD[((Long, Long), LogTSV)] = {
+  def logToEdge(log: LogTSV): Edge[(EdgeId, Attributes)] = {
+    log.entity match {
+      case VERTEX(objId) => throw new IllegalStateException("This does not make sense. Only edges allowed")
+      case EDGE(id, srcId, dstId) => Edge(srcId, dstId, (id, log.attributes))
+    }
+  }
+
+  def getSquashedActionsByEdgeId(logs: RDD[LogTSV]): RDD[(EdgeId, LogTSV)] = {
     // Filter out vertex actions
     val edgeIdWithEdgeActions = logs.flatMap(log => log.entity match {
-      case VERTEX(_) => None
-      case EDGE(srcId, dstId) => Some((srcId, dstId), log)
+      case _: VERTEX => None
+      case EDGE(id, _, _) => Some(id, log)
     })
 
     // Group by edge id and merge
@@ -211,9 +217,8 @@ object SnapshotDeltaObject {
       .map(edgeWithActions => (edgeWithActions._1, mergeLogTSVs(edgeWithActions._2)))
   }
 
-  def applyVertexLogsToSnapshot(snapshot: Graph[LTSV.Attributes, LTSV.Attributes], logs: RDD[LogTSV]): RDD[(VertexId, Attributes)] = {
+  def applyVertexLogsToSnapshot(snapshot: AttributeGraph, logs: RDD[LogTSV]): RDD[(VertexId, Attributes)] = {
     val uuid = java.util.UUID.randomUUID.toString.take(5)
-
     val previousSnapshotVertices = snapshot.vertices
 
     val vertexIDsWithAction: RDD[(Long, LogTSV)] = getSquashedActionsByVertexId(logs)
@@ -246,7 +251,7 @@ object SnapshotDeltaObject {
     // Filter out edge actions
     val vertexIdWithVertexActions = logs.flatMap(log => log.entity match {
       case VERTEX(objId) => Some(objId, log)
-      case EDGE(_, _) => None
+      case _: EDGE => None
     })
 
     // Group by vertex id and merge
@@ -264,7 +269,7 @@ object SnapshotDeltaObject {
         nextLog.copy(attributes = rightWayMergeHashMap(prevLog.attributes, nextLog.attributes)) // Could be either l1 or l2 that is copied
       case (CREATE, UPDATE) =>
         prevLog.copy(attributes = rightWayMergeHashMap(prevLog.attributes, nextLog.attributes))
-      case (prevLogState, nextLogState) => throw new IllegalStateException(s"($prevLogState,$nextLogState encountered when merging logs. The dataset is inconsistent")
+      case (prevLogState, nextLogState) => throw new IllegalStateException(s"($prevLogState,$nextLogState encountered when merging logs. The dataset is inconsistent \n Prev: $prevLog \n Next: $nextLog")
       // Cases that should not happen. We assume the LogTSVs are consistent and makes sense
       // example (DELETE, DELETE), (DELETE, UPDATE) // These do not make sense
     }
@@ -287,7 +292,7 @@ object SnapshotDeltaObject {
    * @param logs Initial log entries
    * @return new Graph
    */
-  def createGraph(logs: RDD[LogTSV]): Graph[Attributes, Attributes] = {
+  def createGraph(logs: RDD[LogTSV]): AttributeGraph = {
     getLogger.warn("Creating (most likely) initial graph from RDD[LogTSV]")
     val firstSnapshotVertices = getInitialVerticesFromLogs(logs)
     val firstSnapshotEdges = getInitialEdgesFromLogs(logs)
@@ -305,10 +310,10 @@ object SnapshotDeltaObject {
     })
   }
 
-  def getInitialEdgesFromLogs(logs: RDD[LogTSV]): RDD[Edge[Attributes]] = {
+  def getInitialEdgesFromLogs(logs: RDD[LogTSV]): RDD[Edge[(EdgeId, Attributes)]] = {
     val edgesWithAction = getSquashedActionsByEdgeId(logs)
     edgesWithAction.flatMap(edge => edge._2.action match {
-      case CREATE => Some(Edge(edge._1._1, edge._1._2, edge._2.attributes)) // Edge was created
+      case CREATE => Some(logToEdge(edge._2)) // Edge was created
       case DELETE => None // Edge was created and deleted (Possibly because of a deleted vertex)
       case UPDATE => throw new IllegalStateException("This should never happen based on the way we do merging")
       // This last case UPDATE should never happen because of the way we do merging?
@@ -321,7 +326,9 @@ object SnapshotDeltaObject {
     } else {
       snapshot2
     }
-  type AttributeGraph = Graph[Attributes, Attributes]
+
+  // This is how a materialized graph should be
+  type AttributeGraph = Graph[Attributes, (EdgeId, Attributes)]
   type LandyAttributeGraph = Graph[LandyVertexPayload, LandyEdgePayload]
 
 }
