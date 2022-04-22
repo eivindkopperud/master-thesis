@@ -28,7 +28,7 @@ sealed abstract class Entity
 object Entity {
   final case class VERTEX(objId: Long) extends Entity
 
-  final case class EDGE(srcId: Long, dstId: Long) extends Entity
+  final case class EDGE(id: Long, srcId: Long, dstId: Long) extends Entity
 }
 
 /** LogTSV
@@ -52,13 +52,15 @@ object LTSV {
   def stringToEntity(s: String): Option[Entity] = {
     s.split(":").toList match {
       case "VERTEX" :: id :: Nil => Some(VERTEX(id.toLong))
-      case "EDGE" :: srcId :: dstId :: Nil => Some(EDGE(srcId.toLong, dstId.toLong))
+      case "EDGE" :: id :: srcId :: dstId :: Nil => Some(EDGE(id.toLong, srcId.toLong, dstId.toLong))
       case _ => None
     }
   }
 
   // Type alias
   type Attributes = immutable.HashMap[String, String]
+  // Like VertexId but for Edges since we are in dire need of a surrogate
+  type EdgeId = Long
 
   /** Serialize a single LogTSV
    *
@@ -74,7 +76,7 @@ object LTSV {
     }
     val entity = logEntry.entity match {
       case VERTEX(id) => s"VERTEX:$id"
-      case EDGE(srcId, dstId) => s"EDGE:$srcId:$dstId"
+      case EDGE(id, srcId, dstId) => s"EDGE:$id:$srcId:$dstId"
     }
     val attributes = serializeAttributes(logEntry.attributes)
 

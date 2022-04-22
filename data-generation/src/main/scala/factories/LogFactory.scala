@@ -84,21 +84,21 @@ case class LogFactory(
     buildSingleSequence(entity, updateAmount + 1).tail
   }
 
-  def getCreateDeleteEdgeTSV(srcAndDstId: (Long, Long), timestamp: Instant, action: Action): LogTSV = {
+  def getCreateDeleteEdgeTSV(edgeIds: EDGE, timestamp: Instant, action: Action): LogTSV = {
     assert(action == CREATE || action == DELETE) // Im lazy
     LogTSV(
       timestamp = timestamp,
       action = action,
-      entity = EDGE.tupled(srcAndDstId),
+      entity = edgeIds,
       attributes = if (action == CREATE) getRandomAttributes else HashMap.empty
     )
   }
 
-  def generateEdgeTSV(srcIdAndDstId: (Long, Long), timestamp: Long): LogTSV = {
+  def generateEdgeTSV(edgeIds: EDGE, timestamp: Long): LogTSV = {
     LogTSV(
       timestamp = Instant.ofEpochSecond(timestamp),
       action = UPDATE,
-      entity = EDGE.tupled(srcIdAndDstId),
+      entity = edgeIds,
       attributes = getRandomAttributes
     )
   }

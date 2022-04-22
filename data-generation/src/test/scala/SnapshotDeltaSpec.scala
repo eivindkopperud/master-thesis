@@ -172,7 +172,7 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
 
     val f = LogFactory()
     val logs = f.buildSingleSequence(VERTEX(1)) ++
-      f.buildSingleSequence(EDGE(1, 2)) ++
+      f.buildSingleSequence(EDGE(8, 1, 2)) ++
       f.buildSingleSequence(VERTEX(2))
     val g = createGraph(logs)
     val update = f.buildSingleSequenceOnlyUpdates(VERTEX(1))
