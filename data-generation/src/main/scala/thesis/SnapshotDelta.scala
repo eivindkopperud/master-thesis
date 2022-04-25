@@ -33,16 +33,16 @@ class SnapshotDelta(val graphs: MutableList[Snapshot],
   override val triplets: RDD[EdgeTriplet[Attributes, Attributes]] = graphs.get(0).get.graph.triplets
   val logger: Logger = getLogger
 
-  def forwardApplyLogs(graph: G, logsToApply: RDD[LogTSV]): G = {
+  def forwardApplyLogs(graph: AttributeGraph, logsToApply: RDD[LogTSV]): AttributeGraph = {
     Graph(
       applyVertexLogsToSnapshot(graph, logsToApply),
       applyEdgeLogsToSnapshot(graph, logsToApply)
     )
   }
 
-  def backwardsApplyLogs(g: G, logsToApply: RDD[LogTSV]): G = throw new NotImplementedError()
+  def backwardsApplyLogs(g: AttributeGraph, logsToApply: RDD[LogTSV]): AttributeGraph = throw new NotImplementedError()
 
-  override def snapshotAtTime(instant: Instant): G = {
+  override def snapshotAtTime(instant: Instant): AttributeGraph = {
 
     val closestGraph = graphs.reduce(returnClosestGraph(instant))
     logger.warn(s"Instant $instant, Closest :graph${closestGraph.instant}")
@@ -109,7 +109,7 @@ object SnapshotIntervalType {
   final case class Count(numberOfActions: Int) extends SnapshotIntervalType
 }
 
-final case class Snapshot(graph: G, instant: Instant)
+final case class Snapshot(graph: AttributeGraph, instant: Instant)
 
 object SnapshotDeltaObject {
   def getLogger: Logger = LoggerFactory.getLogger("SnapShotDelta")
@@ -333,7 +333,7 @@ object SnapshotDeltaObject {
     } else {
       snapshot2
     }
-
-  type G = Graph[Attributes, Attributes]
+  type AttributeGraph = Graph[Attributes, Attributes]
+  type LandyAttributeGraph = Graph[LandyVertexPayload, LandyEdgePayload]
 
 }
