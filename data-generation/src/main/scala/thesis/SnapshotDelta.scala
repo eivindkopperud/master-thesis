@@ -333,6 +333,7 @@ object SnapshotDeltaObject {
     } else {
       snapshot2
     }
-
   type AttributeGraph = Graph[Attributes, Attributes]
+  type LandyAttributeGraph = Graph[LandyVertexPayload, LandyEdgePayload]
+
 }
