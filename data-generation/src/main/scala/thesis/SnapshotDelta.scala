@@ -25,12 +25,14 @@ abstract class TemporalGraph[VD: ClassTag, ED: ClassTag] extends Serializable {
   def snapshotAtTime(instant: Instant): Graph[VD, ED]
 }
 
+case class SnapshotEdgePayload(id: EdgeId, attributes: Attributes)
+
 class SnapshotDelta(val graphs: MutableList[Snapshot],
                     val logs: RDD[LogTSV],
-                    val snapshotType: SnapshotIntervalType) extends TemporalGraph[Attributes, (EdgeId, Attributes)] {
+                    val snapshotType: SnapshotIntervalType) extends TemporalGraph[Attributes, SnapshotEdgePayload] {
   override val vertices: VertexRDD[Attributes] = graphs.get(0).get.graph.vertices
-  override val edges: EdgeRDD[(EdgeId, Attributes)] = graphs.get(0).get.graph.edges
-  override val triplets: RDD[EdgeTriplet[Attributes, (EdgeId, Attributes)]] = graphs.get(0).get.graph.triplets
+  override val edges: EdgeRDD[SnapshotEdgePayload] = graphs.get(0).get.graph.edges
+  override val triplets: RDD[EdgeTriplet[Attributes, SnapshotEdgePayload]] = graphs.get(0).get.graph.triplets
   val logger: Logger = getLogger
 
   def forwardApplyLogs(graph: AttributeGraph, logsToApply: RDD[LogTSV]): AttributeGraph = {
@@ -167,9 +169,16 @@ object SnapshotDeltaObject {
     new SnapshotDelta(graphs, logsWithSortableKey.map(_._2), snapshotIntervalType)
   }
 
-  def applyEdgeLogsToSnapshot(snapshot: AttributeGraph, logs: RDD[LogTSV]): RDD[Edge[(EdgeId, Attributes)]] = {
+  def updateEdgeWithLog(edge: Edge[SnapshotEdgePayload], log: LogTSV): Edge[SnapshotEdgePayload] = {
+    edge
+      .copy(attr =
+        edge.attr
+          .copy(attributes = rightWayMergeHashMap(edge.attr.attributes, log.attributes)))
+  }
+
+  def applyEdgeLogsToSnapshot(snapshot: AttributeGraph, logs: RDD[LogTSV]): RDD[Edge[SnapshotEdgePayload]] = {
     val uuid = java.util.UUID.randomUUID.toString.take(5)
-    val previousSnapshotEdgesKV = snapshot.edges.map(edge => (edge.attr._1, edge))
+    val previousSnapshotEdgesKV = snapshot.edges.map(edge => (edge.attr.id, edge))
 
     val squashedEdgeActions = getSquashedActionsByEdgeId(logs)
 
@@ -177,13 +186,13 @@ object SnapshotDeltaObject {
     val joinedEdges = previousSnapshotEdgesKV.fullOuterJoin(squashedEdgeActions)
 
     // Create, update or omit (delete) edges based on values are present or not.
-    val newSnapshotEdges: RDD[Edge[(EdgeId, LTSV.Attributes)]] = joinedEdges.flatMap(outerJoinedEdge => outerJoinedEdge._2 match {
+    val newSnapshotEdges: RDD[Edge[SnapshotEdgePayload]] = joinedEdges.flatMap(outerJoinedEdge => outerJoinedEdge._2 match {
       case (None, None) => throw new IllegalStateException("The full outer join f*ucked up")
       case (Some(previousEdge), None) => Some(Edge(previousEdge.srcId, previousEdge.dstId, previousEdge.attr)) // Edge existed in the last snapshot, but no changes were done in this interval
-      case (Some(previousEdge), Some(newEdgeAction)) => newEdgeAction.action match { // There has been a change to the edge in the interval
+      case (Some(previousEdge), Some(log)) => log.action match { // There has been a change to the edge in the interval
         case DELETE => None // Edge or {source,destination} vertex was deleted in the new interval
         case UPDATE => // Edge updated in this interval
-          Some(previousEdge.copy(attr = (previousEdge.attr._1, rightWayMergeHashMap(previousEdge.attr._2, newEdgeAction.attributes))))
+          Some(updateEdgeWithLog(previousEdge, log))
         case CREATE =>
           throw new IllegalStateException(s"$uuid An CREATE should never happen since this case should be an action referencing an existing entity")
       }
@@ -198,10 +207,10 @@ object SnapshotDeltaObject {
     newSnapshotEdges
   }
 
-  def logToEdge(log: LogTSV): Edge[(EdgeId, Attributes)] = {
+  def logToEdge(log: LogTSV): Edge[SnapshotEdgePayload] = {
     log.entity match {
       case VERTEX(objId) => throw new IllegalStateException("This does not make sense. Only edges allowed")
-      case EDGE(id, srcId, dstId) => Edge(srcId, dstId, (id, log.attributes))
+      case EDGE(id, srcId, dstId) => Edge(srcId, dstId, SnapshotEdgePayload(id, log.attributes))
     }
   }
 
@@ -310,7 +319,7 @@ object SnapshotDeltaObject {
     })
   }
 
-  def getInitialEdgesFromLogs(logs: RDD[LogTSV]): RDD[Edge[(EdgeId, Attributes)]] = {
+  def getInitialEdgesFromLogs(logs: RDD[LogTSV]): RDD[Edge[SnapshotEdgePayload]] = {
     val edgesWithAction = getSquashedActionsByEdgeId(logs)
     edgesWithAction.flatMap(edge => edge._2.action match {
       case CREATE => Some(logToEdge(edge._2)) // Edge was created
@@ -328,7 +337,8 @@ object SnapshotDeltaObject {
     }
 
   // This is how a materialized graph should be
-  type AttributeGraph = Graph[Attributes, (EdgeId, Attributes)]
+  type AttributeGraph = Graph[Attributes, SnapshotEdgePayload]
   type LandyAttributeGraph = Graph[LandyVertexPayload, LandyEdgePayload]
+
 
 }
