@@ -4,19 +4,17 @@ import org.apache.spark.SparkContext
 import org.apache.spark.graphx.{Edge, Graph}
 import org.apache.spark.rdd.RDD
 import thesis.Action.{CREATE, UPDATE}
-import thesis.LTSV.Attributes
-import utils.LogUtils
+import utils.{LogUtils, UtilsUtils}
 
 import java.time.Instant
 import scala.collection.mutable
 
 object LandyConsumer {
-
   def createEdge(log: LogTSV, validTo: Instant): Edge[LandyEdgePayload] = {
     log.entity match {
       case Entity.VERTEX(_) => throw new IllegalStateException("This should not be called on a log with vertices")
       case Entity.EDGE(srcId, dstId) => {
-        val payload = new LandyEdgePayload(id=1L, validFrom = log.timestamp, validTo = validTo, attributes = log.attributes)
+        val payload = LandyEdgePayload(id=UtilsUtils.uuid, validFrom = log.timestamp, validTo = validTo, attributes = log.attributes)
         Edge(srcId, dstId, payload)
       }
     }
@@ -25,9 +23,8 @@ object LandyConsumer {
   def createVertex(log: LogTSV, validTo: Instant): (Long, LandyVertexPayload) = {
     log.entity match {
       case Entity.VERTEX(objId) => {
-        if (log.timestamp.toString == null || validTo == null) println("this aint good")
-        val payload = LandyVertexPayload(id=1L, validFrom = log.timestamp, validTo = validTo, attributes = log.attributes)
-        (objId, payload)
+        val payload = LandyVertexPayload(id=objId, validFrom = log.timestamp, validTo = validTo, attributes = log.attributes)
+        (UtilsUtils.uuid, payload)
       }
       case Entity.EDGE(_, _) => throw new IllegalStateException("This should not be called on a log with edges")
     }
