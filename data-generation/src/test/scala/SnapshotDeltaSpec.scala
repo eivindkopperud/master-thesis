@@ -144,7 +144,7 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
   }
 
   // backwardsApply is not implemented
-  ignore should "return correct graph given a timestamp close to a snapshot in the future" in {
+  it should "return correct graph given a timestamp close to a snapshot in the future" in {
     implicit val sparkContext: SparkContext = spark.sparkContext
 
     val updates = List(1, 1, 1, 1, 1, 1, 1) // List of amount of updates for t_1, t_2 .. t_6
@@ -154,6 +154,7 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     assertGraphSimilarity(snapshot, createGraph(logs.take(2))) // Take(2) == Instant.ofEpoch(1)
   }
 
+  // This test currently tests an unused function
   "returnClosestGraph" should "return the closet graph given an two graphs and an instant" in {
     implicit val sparkContext: SparkContext = spark.sparkContext
 
