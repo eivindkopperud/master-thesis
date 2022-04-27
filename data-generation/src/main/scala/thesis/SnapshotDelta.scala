@@ -46,19 +46,26 @@ class SnapshotDelta(val graphs: MutableList[Snapshot],
 
   override def snapshotAtTime(instant: Instant): AttributeGraph = {
 
-    val closestGraph = graphs.reduce(returnClosestGraph(instant))
+    //Closest graph should be based on number of logs, not time.
+    // But for it to be feasible each graph should have a sequence ID as well
+    // This is possible, I think, but not implemented
+    val closestGraph = graphs.reduceLeft((snap1, snap2) =>
+      if (snap2.instant > instant) { 
+        snap1
+      } else {
+        snap2
+      })
     logger.warn(s"Instant $instant, Closest :graph${closestGraph.instant}")
     if (closestGraph.instant == instant) {
       logger.warn("The queried graph is already materialized")
       closestGraph.graph
-    } else if (closestGraph.instant.isBefore(instant)) {
-      logger.warn("Closest graph is in the future. Need to apply logs forwards")
+    } else if (instant < closestGraph.instant) { // We are asking an instant before the initial materialized snapshot
+      logger.warn("Closest graph in the future, and there is no one in the past.")
+      createGraph(logs.map(l => (l.timestamp, l)).filterByRange(Instant.MIN, instant).map(_._2))
+    } else {
+      logger.warn("Closest graph is in the past. Need to apply logs forwards")
       val logsToApply = logs.map(l => (l.timestamp, l)).filterByRange(closestGraph.instant, instant).map(_._2)
       forwardApplyLogs(closestGraph.graph, logsToApply)
-    } else {
-      logger.warn("Closest graph is in the past. Need to apply logs backwards")
-      val logsToApply = logs.map(l => (l.timestamp, l)).filterByRange(instant, closestGraph.instant).map(_._2)
-      backwardsApplyLogs(closestGraph.graph, logsToApply)
     }
   }
 
@@ -329,6 +336,14 @@ object SnapshotDeltaObject {
     })
   }
 
+  /** Returns the closest graph for a given instant
+   * Currently unused but might be relevant later
+   *
+   * @param instant   the timestamp
+   * @param snapshot1 snapshot1
+   * @param snapshot2 snapshot2
+   * @return
+   */
   def returnClosestGraph(instant: Instant)(snapshot1: Snapshot, snapshot2: Snapshot): Snapshot =
     if (Duration.between(snapshot1.instant, instant).abs() <= Duration.between(snapshot2.instant, instant).abs()) {
       snapshot1
