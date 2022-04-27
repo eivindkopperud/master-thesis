@@ -1,5 +1,6 @@
 package utils
 
+import org.apache.spark.graphx.VertexId
 import org.apache.spark.rdd.RDD
 import thesis.Entity.{EDGE, VERTEX}
 import thesis.LogTSV
@@ -12,7 +13,7 @@ object LogUtils {
    * @param logs Unprocessed logs for both vertices and edges.
    * @return A RDD of all vertices by id along with their respective logs.
    */
-  def getVertexLogsById(logs: RDD[LogTSV]): RDD[(Long, Iterable[LogTSV])] = {
+  def getVertexLogsById(logs: RDD[LogTSV]): RDD[(VertexId, Iterable[LogTSV])] = {
     // Filter out edge actions
     val vertexIdWithVertexActions = logs.flatMap(log => log.entity match {
       case VERTEX(objId) => Some(objId, log)
@@ -38,5 +39,9 @@ object LogUtils {
 
     // Group by edge id and merge
     edgeIdWithEdgeActions.groupByKey()
+  }
+
+  def reverse(logs: Seq[LogTSV]): Seq[LogTSV] = {
+    logs.sortWith((log1, log2) => log1.timestamp.isAfter(log2.timestamp))
   }
 }

@@ -194,7 +194,7 @@ object SnapshotDeltaObject {
     val uuid = java.util.UUID.randomUUID.toString.take(5) // For debug purposes
     val previousSnapshotVertices = snapshot.vertices
 
-    val vertexIDsWithAction: RDD[(Long, LogTSV)] = getSquashedActionsByVertexId(logs)
+    val vertexIDsWithAction: RDD[(VertexId, LogTSV)] = getSquashedActionsByVertexId(logs)
 
     // Combine vertices from the snapshot with the current log interval
     val joinedVertices = previousSnapshotVertices.fullOuterJoin(vertexIDsWithAction)
@@ -220,7 +220,7 @@ object SnapshotDeltaObject {
     newSnapshotVertices
   }
 
-  def getSquashedActionsByVertexId(logs: RDD[LogTSV]): RDD[(Long, LogTSV)] = {
+  def getSquashedActionsByVertexId(logs: RDD[LogTSV]): RDD[(VertexId, LogTSV)] = {
     LogUtils.getVertexLogsById(logs)
       .map(vertexWithActions => (vertexWithActions._1, mergeLogTSVs(vertexWithActions._2)))
   }
