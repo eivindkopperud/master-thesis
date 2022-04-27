@@ -17,15 +17,26 @@ import scala.util.Try
 
 
 //Should just be a trait
+// TODO refactor this into its own file, snapshotDelta is a very big file ATM
 abstract class TemporalGraph[VD: ClassTag, ED: ClassTag] extends Serializable {
   val vertices: VertexRDD[VD]
   val edges: EdgeRDD[ED]
   val triplets: RDD[EdgeTriplet[VD, ED]]
 
   def snapshotAtTime(instant: Instant): Graph[VD, ED]
+
+  /** Return the ids of entities activated or created in the interval
+   *
+   * @param interval Inclusive interval
+   * @return Tuple with the activated entities
+   */
+  def activatedEntities(interval: Interval): (RDD[VertexId], RDD[EdgeId])
 }
 
 case class SnapshotEdgePayload(id: EdgeId, attributes: Attributes)
+
+//TODO have file with all the finurlige case classes
+case class Interval(start: Instant, stop: Instant)
 
 class SnapshotDelta(val graphs: MutableList[Snapshot],
                     val logs: RDD[LogTSV],
@@ -42,7 +53,13 @@ class SnapshotDelta(val graphs: MutableList[Snapshot],
     )
   }
 
-  def backwardsApplyLogs(g: AttributeGraph, logsToApply: RDD[LogTSV]): AttributeGraph = throw new NotImplementedError()
+  override def activatedEntities(interval: Interval): (RDD[VertexId], RDD[EdgeId]) = {
+    val relevantLogs = getLogsInInterval(logs, interval)
+    val (vertexSquash, edgeSquash) = getSquashedActionsByEntityId(relevantLogs)
+    val activatedVertices = vertexSquash.filter(_._2.action == CREATE).map(_._1)
+    val activatedEdges = edgeSquash.filter(_._2.action == CREATE).map(_._1)
+    (activatedVertices, activatedEdges)
+  }
 
   override def snapshotAtTime(instant: Instant): AttributeGraph = {
 
@@ -183,6 +200,10 @@ object SnapshotDeltaObject {
           .copy(attributes = rightWayMergeHashMap(edge.attr.attributes, log.attributes)))
   }
 
+  def getLogsInInterval(logs: RDD[LogTSV], interval: Interval): RDD[LogTSV] = {
+    logs.map(log => (log.timestamp, log)).filterByRange(interval.start, interval.stop).map(_._2)
+  }
+
   def applyEdgeLogsToSnapshot(snapshot: AttributeGraph, logs: RDD[LogTSV]): RDD[Edge[SnapshotEdgePayload]] = {
     val uuid = java.util.UUID.randomUUID.toString.take(5)
     val previousSnapshotEdgesKV = snapshot.edges.map(edge => (edge.attr.id, edge))
@@ -274,6 +295,8 @@ object SnapshotDeltaObject {
     vertexIdWithVertexActions.groupByKey()
       .map(vertexWithActions => (vertexWithActions._1, mergeLogTSVs(vertexWithActions._2)))
   }
+
+  def getSquashedActionsByEntityId(logs: RDD[LogTSV]): (RDD[(VertexId, LogTSV)], RDD[(EdgeId, LogTSV)]) = (getSquashedActionsByVertexId(logs), getSquashedActionsByEdgeId(logs))
 
   def mergeLogTSVs(logs: Iterable[LogTSV]): LogTSV = logs.reduce(mergeLogTSV)
 
