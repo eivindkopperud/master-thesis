@@ -9,16 +9,6 @@ import org.slf4j.LoggerFactory
 
 import java.time.Instant
 
-final case class TimeInterval(start: Instant, stop: Instant)
-
-sealed abstract class DataSource
-
-object DataSource {
-  final case object Reptilian extends DataSource
-
-  final case object FbMessages extends DataSource
-
-}
 
 object TopologyGraphGenerator {
 
@@ -34,7 +24,7 @@ object TopologyGraphGenerator {
   def generateGraph(
                      threshold: BigDecimal,
                      dataSource: DataSource = DataSource.Reptilian
-                   )(implicit spark: SparkSession): Graph[Long, TimeInterval] = {
+                   )(implicit spark: SparkSession): Graph[Long, Interval] = {
     val (filePath, delimiter) = getPathAndDelim(dataSource)
 
     val logger = LoggerFactory.getLogger("TopologyGraphGenerator")
@@ -56,12 +46,12 @@ object TopologyGraphGenerator {
       .rdd.map(row => row.getAs[String]("from").toLong)
       .map(long => (long, long))
 
-    val edges: RDD[Edge[TimeInterval]] = leadDf
+    val edges: RDD[Edge[Interval]] = leadDf
       .select("from", "to", "from time", "to time")
       .rdd.map(
       row => {
         Edge(row.getAs[String]("from").toLong, row.getAs[String]("to").toLong,
-          TimeInterval(Instant.ofEpochSecond(row.getAs[String]("from time").toLong), Instant.ofEpochSecond(row.getAs[String]("to time").toLong)))
+          Interval(Instant.ofEpochSecond(row.getAs[String]("from time").toLong), Instant.ofEpochSecond(row.getAs[String]("to time").toLong)))
       }
     )
 
