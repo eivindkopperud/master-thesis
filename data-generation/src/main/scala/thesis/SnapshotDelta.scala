@@ -53,6 +53,19 @@ class SnapshotDelta(val graphs: MutableList[Snapshot],
     )
   }
 
+  def getClosestGraph(graphs: Seq[Snapshot], instant: Instant): Snapshot =
+    graphs.reduceLeft((snap1, snap2) =>
+      if (snap2.instant > instant) {
+        snap1
+      } else {
+        snap2
+      })
+
+  /** Return the ids of entities activated or created in the interval
+   *
+   * @param interval Inclusive interval
+   * @return Tuple with the activated entities
+   */
   override def activatedEntities(interval: Interval): (RDD[VertexId], RDD[EdgeId]) = {
     val relevantLogs = getLogsInInterval(logs, interval)
     val (vertexSquash, edgeSquash) = getSquashedActionsByEntityId(relevantLogs)
@@ -63,67 +76,21 @@ class SnapshotDelta(val graphs: MutableList[Snapshot],
 
   override def snapshotAtTime(instant: Instant): AttributeGraph = {
 
-    //Closest graph should be based on number of logs, not time.
-    // But for it to be feasible each graph should have a sequence ID as well
-    // This is possible, I think, but not implemented
-    val closestGraph = graphs.reduceLeft((snap1, snap2) =>
-      if (snap2.instant > instant) { 
-        snap1
-      } else {
-        snap2
-      })
+    val closestGraph = getClosestGraph(graphs, instant)
     logger.warn(s"Instant $instant, Closest :graph${closestGraph.instant}")
     if (closestGraph.instant == instant) {
       logger.warn("The queried graph is already materialized")
       closestGraph.graph
-    } else if (instant < closestGraph.instant) { // We are asking an instant before the initial materialized snapshot
+    } else if (instant < closestGraph.instant) {
       logger.warn("Closest graph in the future, and there is no one in the past.")
-      createGraph(logs.map(l => (l.timestamp, l)).filterByRange(Instant.MIN, instant).map(_._2))
+      val initialLogs = getLogsInInterval(logs, Interval(Instant.MIN, instant))
+      createGraph(initialLogs)
     } else {
       logger.warn("Closest graph is in the past. Need to apply logs forwards")
-      val logsToApply = logs.map(l => (l.timestamp, l)).filterByRange(closestGraph.instant, instant).map(_._2)
+      val logsToApply = getLogsInInterval(logs, Interval(closestGraph.instant, instant))
       forwardApplyLogs(closestGraph.graph, logsToApply)
     }
   }
-
-
-  /*
-    override def persist(newLevel: StorageLevel): Graph[VD, ED] = graph.persist(newLevel)
-
-    override def cache(): Graph[VD, ED] = graph.cache
-
-    override def checkpoint(): Unit = graph.checkpoint
-
-    override def isCheckpointed: Boolean = graph.isCheckpointed
-
-    override def getCheckpointFiles: Seq[String] = graph.getCheckpointFiles
-
-    override def unpersist(blocking: Boolean): Graph[VD, ED] = graph.unpersist(blocking)
-
-    override def unpersistVertices(blocking: Boolean): Graph[VD, ED] = graph.unpersistVertices(blocking)
-
-    override def partitionBy(partitionStrategy: PartitionStrategy): Graph[VD, ED] = graph.partitionBy(partitionStrategy)
-
-    override def partitionBy(partitionStrategy: PartitionStrategy, numPartitions: PartitionID): Graph[VD, ED] = graph.partitionBy(partitionStrategy, numPartitions)
-
-    override def mapVertices[VD2](map: (VertexId, VD) => VD2)(implicit evidence$3: ClassTag[VD2], eq: VD =:= VD2): Graph[VD2, ED] = graph.mapVertices(map)(evidence$3, eq)
-
-    override def mapEdges[ED2](map: (PartitionID, Iterator[Edge[ED]]) => Iterator[ED2])(implicit evidence$5: ClassTag[ED2]): Graph[VD, ED2] = graph.mapEdges(map)(evidence$5)
-
-    override def mapTriplets[ED2](map: (PartitionID, Iterator[EdgeTriplet[VD, ED]]) => Iterator[ED2], tripletFields: TripletFields)(implicit evidence$8: ClassTag[ED2]): Graph[VD, ED2] =
-      graph.mapTriplets(map, tripletFields)(evidence$8)
-
-    override def reverse: Graph[VD, ED] = graph.reverse
-
-    override def subgraph(epred: EdgeTriplet[VD, ED] => Boolean, vpred: (VertexId, VD) => Boolean): Graph[VD, ED] = graph.subgraph(epred, vpred)
-
-    override def mask[VD2, ED2](other: Graph[VD2, ED2])(implicit evidence$9: ClassTag[VD2], evidence$10: ClassTag[ED2]): Graph[VD, ED] = graph.mask(other)(evidence$9, evidence$10)
-
-    override def groupEdges(merge: (ED, ED) => ED): Graph[VD, ED] = graph.groupEdges(merge)
-
-    override def outerJoinVertices[U, VD2](other: RDD[(VertexId, U)])(mapFunc: (VertexId, VD, Option[U]) => VD2)(implicit evidence$13: ClassTag[U], evidence$14: ClassTag[VD2], eq: VD =:= VD2): Graph[VD2, ED] =
-      graph.outerJoinVertices(other)(mapFunc)(evidence$13, evidence$14, eq)
-   */
 }
 
 
@@ -200,12 +167,21 @@ object SnapshotDeltaObject {
           .copy(attributes = rightWayMergeHashMap(edge.attr.attributes, log.attributes)))
   }
 
+  /** Retrieve logs in the inclusive interval
+   *
+   * @param logs
+   * @param interval
+   * @return
+   */
   def getLogsInInterval(logs: RDD[LogTSV], interval: Interval): RDD[LogTSV] = {
-    logs.map(log => (log.timestamp, log)).filterByRange(interval.start, interval.stop).map(_._2)
+    logs
+      .map(log => (log.timestamp, log))
+      .filterByRange(interval.start, interval.stop)
+      .map(_._2)
   }
 
   def applyEdgeLogsToSnapshot(snapshot: AttributeGraph, logs: RDD[LogTSV]): RDD[Edge[SnapshotEdgePayload]] = {
-    val uuid = java.util.UUID.randomUUID.toString.take(5)
+    val uuid = java.util.UUID.randomUUID.toString.take(5) // For debugging purposes
     val previousSnapshotEdgesKV = snapshot.edges.map(edge => (edge.attr.id, edge))
 
     val squashedEdgeActions = getSquashedActionsByEdgeId(logs)
@@ -237,7 +213,7 @@ object SnapshotDeltaObject {
 
   def logToEdge(log: LogTSV): Edge[SnapshotEdgePayload] = {
     log.entity match {
-      case VERTEX(objId) => throw new IllegalStateException("This does not make sense. Only edges allowed")
+      case _: VERTEX => throw new IllegalStateException("This does not make sense. Only edges allowed")
       case EDGE(id, srcId, dstId) => Edge(srcId, dstId, SnapshotEdgePayload(id, log.attributes))
     }
   }
@@ -250,12 +226,13 @@ object SnapshotDeltaObject {
     })
 
     // Group by edge id and merge
-    edgeIdWithEdgeActions.groupByKey()
+    edgeIdWithEdgeActions
+      .groupByKey()
       .map(edgeWithActions => (edgeWithActions._1, mergeLogTSVs(edgeWithActions._2)))
   }
 
   def applyVertexLogsToSnapshot(snapshot: AttributeGraph, logs: RDD[LogTSV]): RDD[(VertexId, Attributes)] = {
-    val uuid = java.util.UUID.randomUUID.toString.take(5)
+    val uuid = java.util.UUID.randomUUID.toString.take(5) // For debug purposes
     val previousSnapshotVertices = snapshot.vertices
 
     val vertexIDsWithAction: RDD[(Long, LogTSV)] = getSquashedActionsByVertexId(logs)
