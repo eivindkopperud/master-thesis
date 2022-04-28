@@ -3,8 +3,8 @@ package factories
 import com.github.javafaker.Faker
 import org.apache.spark.graphx.VertexId
 import thesis.Action.{CREATE, DELETE, UPDATE}
+import thesis.DataTypes.Attributes
 import thesis.Entity.{EDGE, VERTEX}
-import thesis.LTSV.Attributes
 import thesis.{Action, Entity, LogTSV}
 import utils.TimeUtils
 

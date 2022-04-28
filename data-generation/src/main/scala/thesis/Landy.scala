@@ -2,15 +2,10 @@ package thesis
 
 import org.apache.spark.graphx._
 import org.apache.spark.rdd.RDD
-import thesis.LTSV.{Attributes, EdgeId}
-import thesis.SnapshotDeltaObject.LandyAttributeGraph
+import thesis.DataTypes.{EdgeId, LandyAttributeGraph}
 
 import java.time.Instant
 import scala.math.Ordered.orderingToOrdered
-
-case class LandyVertexPayload(id: Long, validFrom: Instant, validTo: Instant, attributes: Attributes)
-
-case class LandyEdgePayload(id: Long, validFrom: Instant, validTo: Instant, attributes: Attributes)
 
 
 class Landy(val graph: LandyAttributeGraph) extends TemporalGraph[LandyVertexPayload, LandyEdgePayload] {
