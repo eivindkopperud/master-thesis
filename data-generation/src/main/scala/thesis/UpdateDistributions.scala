@@ -14,29 +14,6 @@ import thesis.Entity.EDGE
 import java.nio.file.{Files, Paths}
 import scala.reflect.ClassTag
 
-sealed abstract class CorrelationMode
-
-object CorrelationMode {
-  final case object Uniform extends CorrelationMode
-
-  final case object PositiveCorrelation extends CorrelationMode
-
-  final case object NegativeCorrelation extends CorrelationMode
-}
-
-sealed abstract class DistributionType
-
-object DistributionType {
-  final case class LogNormalType(mu: Int, sigma: Double) extends DistributionType
-
-  final case class GaussianType(mu: Int, sigma: Double) extends DistributionType
-
-  final case class UniformType(low: Double, high: Double) extends DistributionType
-}
-
-final case class IntervalAndUpdateCount(interval: TimeInterval, count: Int)
-
-final case class IntervalAndDegrees(interval: TimeInterval, degree: Int)
 
 object UpdateDistributions {
 
@@ -95,7 +72,7 @@ object UpdateDistributions {
    * @param distribution Some probability distribution
    * @return */
   def addEdgeUpdateDistribution[VD](sc: SparkContext,
-                                    graph: Graph[Int, TimeInterval],
+                                    graph: Graph[Int, Interval],
                                     mode: CorrelationMode,
                                     distribution: DistributionType): Graph[Int, IntervalAndUpdateCount] = {
     getLogger.warn(s"Adding updates to edges")
@@ -206,18 +183,18 @@ object UpdateDistributions {
    * @param mu    Expected value
    * @param sigma Standard deviation
    */
-  def addLogNormalGraphUpdateDistribution[VD: ClassTag](sc: SparkContext, graph: Graph[VD, TimeInterval], mu: Int = 100, sigma: Double = 2): Graph[Int, IntervalAndUpdateCount] = {
+  def addLogNormalGraphUpdateDistribution[VD: ClassTag](sc: SparkContext, graph: Graph[VD, Interval], mu: Int = 100, sigma: Double = 2): Graph[Int, IntervalAndUpdateCount] = {
     val g1 = addVertexUpdateDistribution(sc, graph, CorrelationMode.PositiveCorrelation, LogNormalType(mu, sigma))
     addEdgeUpdateDistribution(sc, g1, CorrelationMode.PositiveCorrelation, LogNormalType(mu, sigma))
   }
 
-  def addGraphUpdateDistribution[VD: ClassTag](graph: Graph[VD, TimeInterval], mode: DistributionType = UniformType(0, 10))(implicit sc: SparkContext): Graph[Int, IntervalAndUpdateCount] = {
+  def addGraphUpdateDistribution[VD: ClassTag](graph: Graph[VD, Interval], mode: DistributionType = UniformType(0, 10))(implicit sc: SparkContext): Graph[Int, IntervalAndUpdateCount] = {
     getLogger.warn(s"Adding updates with distribution type:$mode")
     val g1 = addVertexUpdateDistribution(sc, graph, CorrelationMode.PositiveCorrelation, mode)
     addEdgeUpdateDistribution(sc, g1, CorrelationMode.PositiveCorrelation, mode)
   }
 
-  def getLogs[VD: ClassTag](sc: SparkContext, graph: Graph[VD, TimeInterval]): RDD[LogTSV] = {
+  def getLogs[VD: ClassTag](sc: SparkContext, graph: Graph[VD, Interval]): RDD[LogTSV] = {
     getLogger.warn("Generating updates")
     val g = addGraphUpdateDistribution(graph)(implicitly, sc)
     generateLogs(g)
@@ -243,7 +220,7 @@ object UpdateDistributions {
    * @tparam VD Type of input graph
    * @return RDD[LogTSV] ready for further processing
    */
-  def loadOrGenerateLogs[VD: ClassTag](sc: SparkContext, graph: Graph[VD, TimeInterval], path: String = "stored_logs"): RDD[LogTSV] = {
+  def loadOrGenerateLogs[VD: ClassTag](sc: SparkContext, graph: Graph[VD, Interval], path: String = "stored_logs"): RDD[LogTSV] = {
     if (Files.exists(Paths.get(path))) {
       getLogger.warn("Fetching from file")
       sc.objectFile[LogTSV](path)

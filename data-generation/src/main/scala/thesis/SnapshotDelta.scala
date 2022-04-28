@@ -5,38 +5,14 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.rdd.RDD.rddToOrderedRDDFunctions
 import org.slf4j.{Logger, LoggerFactory}
 import thesis.Action.{CREATE, DELETE, UPDATE}
+import thesis.DataTypes.{AttributeGraph, Attributes, EdgeId}
 import thesis.Entity.{EDGE, VERTEX}
-import thesis.LTSV.{Attributes, EdgeId}
 import thesis.SnapshotDeltaObject._
 
 import java.time.{Duration, Instant}
 import scala.collection.mutable.MutableList
 import scala.math.Ordered.orderingToOrdered
-import scala.reflect.ClassTag
 import scala.util.Try
-
-
-//Should just be a trait
-// TODO refactor this into its own file, snapshotDelta is a very big file ATM
-abstract class TemporalGraph[VD: ClassTag, ED: ClassTag] extends Serializable {
-  val vertices: VertexRDD[VD]
-  val edges: EdgeRDD[ED]
-  val triplets: RDD[EdgeTriplet[VD, ED]]
-
-  def snapshotAtTime(instant: Instant): Graph[VD, ED]
-
-  /** Return the ids of entities activated or created in the interval
-   *
-   * @param interval Inclusive interval
-   * @return Tuple with the activated entities
-   */
-  def activatedEntities(interval: Interval): (RDD[VertexId], RDD[EdgeId])
-}
-
-case class SnapshotEdgePayload(id: EdgeId, attributes: Attributes)
-
-//TODO have file with all the finurlige case classes
-case class Interval(start: Instant, stop: Instant)
 
 class SnapshotDelta(val graphs: MutableList[Snapshot],
                     val logs: RDD[LogTSV],
@@ -93,16 +69,6 @@ class SnapshotDelta(val graphs: MutableList[Snapshot],
   }
 }
 
-
-sealed abstract class SnapshotIntervalType
-
-object SnapshotIntervalType {
-  final case class Time(duration: Int) extends SnapshotIntervalType
-
-  final case class Count(numberOfActions: Int) extends SnapshotIntervalType
-}
-
-final case class Snapshot(graph: AttributeGraph, instant: Instant)
 
 object SnapshotDeltaObject {
   def getLogger: Logger = LoggerFactory.getLogger("SnapShotDelta")
@@ -169,8 +135,8 @@ object SnapshotDeltaObject {
 
   /** Retrieve logs in the inclusive interval
    *
-   * @param logs
-   * @param interval
+   * @param logs     logs
+   * @param interval interval
    * @return
    */
   def getLogsInInterval(logs: RDD[LogTSV], interval: Interval): RDD[LogTSV] = {
@@ -299,7 +265,7 @@ object SnapshotDeltaObject {
    * @param dominantAttributes dominant HashMap
    * @return merged HashMap
    */
-  def rightWayMergeHashMap(attributes: LTSV.Attributes, dominantAttributes: LTSV.Attributes): LTSV.Attributes = {
+  def rightWayMergeHashMap(attributes: Attributes, dominantAttributes: Attributes): Attributes = {
     attributes.merged(dominantAttributes)((_, y) => y)
   }
 
@@ -350,10 +316,6 @@ object SnapshotDeltaObject {
     } else {
       snapshot2
     }
-
-  // This is how a materialized graph should be
-  type AttributeGraph = Graph[Attributes, SnapshotEdgePayload]
-  type LandyAttributeGraph = Graph[LandyVertexPayload, LandyEdgePayload]
 
 
 }

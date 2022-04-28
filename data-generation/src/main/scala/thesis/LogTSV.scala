@@ -2,51 +2,13 @@ package thesis
 
 import org.apache.spark.rdd.RDD
 import thesis.Action.{CREATE, DELETE, UPDATE}
+import thesis.DataTypes.Attributes
 import thesis.Entity.{EDGE, VERTEX}
-import thesis.LTSV.Attributes
 
 import java.time.{Instant, LocalDateTime, ZoneOffset}
 import scala.collection.immutable
 import scala.io.Source
 import scala.util.Try
-
-/** Action Enum
- *
- */
-sealed abstract class Action
-
-object Action {
-  final case object CREATE extends Action
-
-  final case object UPDATE extends Action
-
-  final case object DELETE extends Action
-}
-
-sealed abstract class Entity
-
-object Entity {
-  final case class VERTEX(objId: Long) extends Entity
-
-  final case class EDGE(id: Long, srcId: Long, dstId: Long) extends Entity
-}
-
-/** LogTSV
- *
- * Everything is built around this case class
- *
- * @param timestamp  When did the log_entry happen?
- * @param action     Type of action
- * @param entity     The type of the object with id(s)
- * @param attributes List of (Key,Value) attributes relevant to the entry
- */
-case class LogTSV(
-                   timestamp: Instant,
-                   action: Action,
-                   entity: Entity,
-                   attributes: Attributes
-                 )
-
 
 object LTSV {
   def stringToEntity(s: String): Option[Entity] = {
@@ -57,10 +19,6 @@ object LTSV {
     }
   }
 
-  // Type alias
-  type Attributes = immutable.HashMap[String, String]
-  // Like VertexId but for Edges since we are in dire need of a surrogate
-  type EdgeId = Long
 
   /** Serialize a single LogTSV
    *
