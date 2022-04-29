@@ -1,6 +1,6 @@
 package factories
 
-import org.apache.spark.graphx.{Edge, Graph}
+import org.apache.spark.graphx.{Edge, Graph, VertexId}
 import org.apache.spark.sql.SparkSession
 import thesis.DataTypes.LandyAttributeGraph
 import thesis.SparkConfiguration.getSparkSession
@@ -23,8 +23,7 @@ object LandyGraphFactory {
   val t2 = Instant.parse("2001-01-01T00:00:00.000Z")
   val t3 = Instant.parse("2002-01-01T00:00:00.000Z")
 
-  def getVertices(): Seq[(Long, LandyVertexPayload)] = {
-
+  def getVertices(): Seq[(VertexId, LandyVertexPayload)] = {
     Seq(
       (1000L,
         LandyVertexPayload(
