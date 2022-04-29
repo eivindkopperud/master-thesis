@@ -9,7 +9,7 @@ import thesis.Action.{CREATE, DELETE, UPDATE}
 import thesis.Entity.{EDGE, VERTEX}
 import thesis.SnapshotDeltaObject.{applyVertexLogsToSnapshot, createGraph, getSquashedActionsByVertexId, mergeLogTSV}
 import thesis.SnapshotIntervalType.{Count, Time}
-import thesis.{LogTSV, Snapshot, SnapshotDeltaObject}
+import thesis._
 import utils.TimeUtils._
 import wrappers.SparkTestWrapper
 
@@ -181,6 +181,35 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     val appliedG = applyVertexLogsToSnapshot(g, update ++ create)
     assert(appliedG.collect().find(x => x._1 == 1).head._2 == update.reverse.head.attributes)
     assert(appliedG.collect().find(x => x._1 == 3).head._2 == create.head.attributes)
+
+  }
+
+  //TODO REFACTOR split this test into two, one for activatedVertices and one for activatedEdges
+  "activatedEntities" should "retrieve the activated entities in an interval" in {
+    implicit val sparkContext: SparkContext = spark.sparkContext // Needed for implicit conversion of Seq -> RDD
+
+    val vertexLogs1 = LogFactory(startTime = 2, endTime = 8).buildSingleSequence(VERTEX(1))
+    val vertexLogs2 = LogFactory(startTime = 5, endTime = 10).buildSingleSequence(VERTEX(2))
+    val edgeLogs = LogFactory(startTime = 4, endTime = 7).buildSingleSequence(EDGE(1, 1, 2))
+    val logs = (vertexLogs1 ++ vertexLogs2 ++ edgeLogs).sortBy(_.timestamp)
+    val g = SnapshotDeltaObject.create(logs, SnapshotIntervalType.Time(3))
+    val intervalWithVertex1 = g.activatedEntities(Interval(0, 3))
+    val intervalWithVertex2 = g.activatedEntities(Interval(5, 7))
+    val intervalWithEdge = g.activatedEntities(Interval(3, 4))
+    val intervalWithV1andEdge = g.activatedEntities(Interval(0, 4))
+    val intervalWithV2andEdge = g.activatedEntities(Interval(4, 7))
+    val intervalWithAll = g.activatedEntities(Interval(0, 10))
+
+
+    assert(intervalWithVertex1._1.take(1).head == 1L && intervalWithVertex1._2.isEmpty() && intervalWithVertex1._1.count() == 1)
+    assert(intervalWithVertex2._1.take(1).head == 2L && intervalWithVertex2._2.isEmpty() && intervalWithVertex2._1.count() == 1)
+
+    assert(intervalWithEdge._2.take(1).head == 1L && intervalWithEdge._1.isEmpty())
+
+    assert(intervalWithV1andEdge._1.take(1).head == 1L && intervalWithV1andEdge._2.count() == 1)
+    assert(intervalWithV2andEdge._1.take(1).head == 2L && intervalWithV2andEdge._2.count() == 1)
+
+    assert(intervalWithAll._1.collect().toSet == Set(1L, 2L) && intervalWithAll._2.count() == 1)
 
   }
 }
