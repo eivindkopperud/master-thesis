@@ -30,7 +30,7 @@ case class LogFactory(
   }
 
   def buildSingleSequence(entity: Entity, updateAmount: Int = 5): Seq[LogTSV] = {
-    val timestamps = TimeUtils.getRandomOrderedTimestamps(updateAmount, startTime, endTime)
+    val timestamps = TimeUtils.getDeterministicOrderedTimestamps(updateAmount, startTime, endTime)
     val create = Seq(LogTSV(
       timestamp = timestamps.head,
       action = CREATE,

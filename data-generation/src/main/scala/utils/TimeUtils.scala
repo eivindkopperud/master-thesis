@@ -13,6 +13,19 @@ object TimeUtils {
       .map(timestamp => Instant.ofEpochSecond(timestamp.toLong))
   }
 
+  def getDeterministicOrderedTimestamps(amount: Int, startTime: Instant, endTime: Instant): Seq[Instant] = {
+    // 5: 1->5 = [1,2,3,4,5]
+    if (amount == 1) {
+      return Seq(startTime)
+    }
+    val step = (endTime.getEpochSecond - startTime.getEpochSecond) / (amount - 1)
+    var timestamps = Seq[Instant]()
+    for (i <- 0 until amount) {
+      timestamps = timestamps :+ Instant.ofEpochSecond(startTime.getEpochSecond + i * step)
+    }
+    timestamps
+  }
+
   /** Convert Long to Instant
    *
    * If this function is in scope, everytime someone uses Long for a function that
