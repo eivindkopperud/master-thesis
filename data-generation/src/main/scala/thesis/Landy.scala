@@ -31,12 +31,10 @@ class Landy(graph: LandyAttributeGraph) extends TemporalGraph[LandyVertexPayload
     Graph(vertices, edges)
   }
 
-  /** Return the ids of entities activated or created in the interval
-   *
-   * @param interval Inclusive interval
-   * @return Tuple with the activated entities
-   */
-  override def activatedEntities(interval: Interval): (RDD[VertexId], RDD[EdgeId]) = throw new NotImplementedError()
+  override def activatedVertices(interval: Interval): RDD[VertexId] = throw new NotImplementedError()
+
+  override def activatedEdges(interval: Interval): RDD[EdgeId] = throw new NotImplementedError()
+
 }
 
 object Landy {

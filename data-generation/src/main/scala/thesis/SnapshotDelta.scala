@@ -37,17 +37,18 @@ class SnapshotDelta(val graphs: MutableList[Snapshot],
         snap2
       })
 
-  /** Return the ids of entities activated or created in the interval
-   *
-   * @param interval Inclusive interval
-   * @return Tuple with the activated entities
-   */
-  override def activatedEntities(interval: Interval): (RDD[VertexId], RDD[EdgeId]) = {
+  override def activatedVertices(interval: Interval): RDD[VertexId] = {
     val relevantLogs = getLogsInInterval(logs, interval)
-    val (vertexSquash, edgeSquash) = getSquashedActionsByEntityId(relevantLogs)
-    val activatedVertices = vertexSquash.filter(_._2.action == CREATE).map(_._1)
-    val activatedEdges = edgeSquash.filter(_._2.action == CREATE).map(_._1)
-    (activatedVertices, activatedEdges)
+    val vertexSquash = getSquashedActionsByVertexId(relevantLogs)
+
+    vertexSquash.filter(_._2.action == CREATE).map(_._1)
+  }
+
+  override def activatedEdges(interval: Interval): RDD[EdgeId] = {
+    val relevantLogs = getLogsInInterval(logs, interval)
+    val edgeSquash = getSquashedActionsByEdgeId(relevantLogs)
+
+    edgeSquash.filter(_._2.action == CREATE).map(_._1)
   }
 
   override def snapshotAtTime(instant: Instant): AttributeGraph = {
