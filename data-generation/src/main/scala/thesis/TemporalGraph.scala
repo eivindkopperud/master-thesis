@@ -20,6 +20,16 @@ abstract class TemporalGraph[VD: ClassTag, ED: ClassTag] extends Serializable {
    * @param interval Inclusive interval
    * @return Tuple with the activated entities
    */
+
+  /**
+   * Get all vertices that were in contact with the given vertexId at any time in the interval
+   *
+   * @param vertexId The id of the vertex we want to find the neighbours of
+   * @param interval The time period we want to check for
+   * @return The ids of all the neighbours of the queried vertex
+   */
+  def directNeighbours(vertexId: VertexId, interval: Interval): RDD[VertexId]
+
   final def activatedEntities(interval: Interval): (RDD[VertexId], RDD[EdgeId]) = {
     (activatedVertices(interval), activatedEdges(interval))
   }

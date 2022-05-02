@@ -31,6 +31,8 @@ class Landy(graph: LandyAttributeGraph) extends TemporalGraph[LandyEntityPayload
     )
     Graph(vertices, edges)
   }
+  
+  override def directNeighbours(vertexId: VertexId, interval: Interval): RDD[VertexId] = throw new NotImplementedError()
 
   override def activatedVertices(interval: Interval): RDD[VertexId] = {
     val firstLocalVertices = localVertices // Remove global vertices
