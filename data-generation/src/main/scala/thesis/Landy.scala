@@ -37,6 +37,8 @@ class Landy(graph: LandyAttributeGraph) extends TemporalGraph[LandyVertexPayload
    * @return Tuple with the activated entities
    */
   override def activatedEntities(interval: Interval): (RDD[VertexId], RDD[EdgeId]) = throw new NotImplementedError()
+  
+  override def directNeighbours(vertexId: VertexId, interval: Interval): RDD[VertexId] = throw new NotImplementedError()
 }
 
 object Landy {

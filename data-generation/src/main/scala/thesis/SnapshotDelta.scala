@@ -67,6 +67,8 @@ class SnapshotDelta(val graphs: MutableList[Snapshot],
       forwardApplyLogs(closestGraph.graph, logsToApply)
     }
   }
+  
+  override def directNeighbours(vertexId: VertexId, interval: Interval): RDD[VertexId] = throw new NotImplementedError()
 }
 
 
