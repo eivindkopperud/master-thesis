@@ -7,13 +7,9 @@ import java.time.Instant
 import scala.collection.immutable
 
 object DataTypes {
-  //SnapshotDeltaGraph
   type AttributeGraph = Graph[Attributes, SnapshotEdgePayload]
-  //LandyGraph
-  type LandyAttributeGraph = Graph[LandyVertexPayload, LandyEdgePayload]
-  // Type alias
+  type LandyAttributeGraph = Graph[LandyEntityPayload, LandyEntityPayload]
   type Attributes = immutable.HashMap[String, String]
-  // Like VertexId but for Edges since we are in dire need of a surrogate
   type EdgeId = Long
 }
 
@@ -32,9 +28,7 @@ object SnapshotIntervalType {
 
 final case class Snapshot(graph: AttributeGraph, instant: Instant)
 
-case class LandyVertexPayload(id: Long, validFrom: Instant, validTo: Instant, attributes: Attributes)
-
-case class LandyEdgePayload(id: Long, validFrom: Instant, validTo: Instant, attributes: Attributes)
+case class LandyEntityPayload(id: Long, validFrom: Instant, validTo: Instant, attributes: Attributes)
 
 sealed abstract class DataSource
 

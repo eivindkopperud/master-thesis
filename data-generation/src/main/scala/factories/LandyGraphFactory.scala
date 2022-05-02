@@ -4,7 +4,7 @@ import org.apache.spark.graphx.{Edge, Graph, VertexId}
 import org.apache.spark.sql.SparkSession
 import thesis.DataTypes.LandyAttributeGraph
 import thesis.SparkConfiguration.getSparkSession
-import thesis.{LandyEdgePayload, LandyVertexPayload}
+import thesis.LandyEntityPayload
 
 import java.time.Instant
 import scala.collection.immutable.HashMap
@@ -23,10 +23,10 @@ object LandyGraphFactory {
   val t2 = Instant.parse("2001-01-01T00:00:00.000Z")
   val t3 = Instant.parse("2002-01-01T00:00:00.000Z")
 
-  def getVertices(): Seq[(VertexId, LandyVertexPayload)] = {
+  def getVertices(): Seq[(VertexId, LandyEntityPayload)] = {
     Seq(
       (1000L,
-        LandyVertexPayload(
+        LandyEntityPayload(
           id = 1L,
           validFrom = t1,
           validTo = t2,
@@ -36,7 +36,7 @@ object LandyGraphFactory {
         )
       ),
       (1001L,
-        LandyVertexPayload(
+        LandyEntityPayload(
           id = 1L,
           validFrom = t2,
           validTo = t3,
@@ -46,7 +46,7 @@ object LandyGraphFactory {
         )
       ),
       (1002L,
-        LandyVertexPayload(
+        LandyEntityPayload(
           id = 2L,
           validFrom = t1,
           validTo = t3,
@@ -58,10 +58,10 @@ object LandyGraphFactory {
     )
   }
 
-  def getEdges(): Seq[Edge[LandyEdgePayload]] = {
+  def getEdges(): Seq[Edge[LandyEntityPayload]] = {
     Seq(
       Edge(1L, 2L,
-        LandyEdgePayload(
+        LandyEntityPayload(
           id = 1003L,
           validFrom = t1,
           validTo = t2,
@@ -71,7 +71,7 @@ object LandyGraphFactory {
         )
       ),
       Edge(1L, 2L,
-        LandyEdgePayload(
+        LandyEntityPayload(
           id = 1004L,
           validFrom = t2,
           validTo = t3,

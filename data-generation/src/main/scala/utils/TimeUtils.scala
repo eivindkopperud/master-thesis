@@ -13,6 +13,15 @@ object TimeUtils {
       .map(timestamp => Instant.ofEpochSecond(timestamp.toLong))
   }
 
+  /**
+   * Get evenly distributed timestamps.
+   * E.g. amount=5, startTime=1, endTime=5 returns [1, 2, 3, 4, 5]
+   *
+   * @param amount    The number of timestamps wanted
+   * @param startTime The first timestamp in the returned value
+   * @param endTime   The last timestamp in the returned value
+   * @return
+   */
   def getDeterministicOrderedTimestamps(amount: Int, startTime: Instant, endTime: Instant): Seq[Instant] = {
     if (amount == 1) {
       return Seq(startTime)
