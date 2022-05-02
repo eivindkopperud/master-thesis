@@ -14,12 +14,12 @@ abstract class TemporalGraph[VD: ClassTag, ED: ClassTag] extends Serializable {
 
   def snapshotAtTime(instant: Instant): Graph[VD, ED]
 
-  /** Return the ids of entities activated or created in the interval
+  /** Return the ids of the entities that were either
+   * activated or created in the interval
    *
    * @param interval Inclusive interval
    * @return Tuple with the activated entities
    */
-  def activatedEntities(interval: Interval): (RDD[VertexId], RDD[EdgeId])
 
   /**
    * Get all vertices that were in contact with the given vertexId at any time in the interval
@@ -29,4 +29,26 @@ abstract class TemporalGraph[VD: ClassTag, ED: ClassTag] extends Serializable {
    * @return The ids of all the neighbours of the queried vertex
    */
   def directNeighbours(vertexId: VertexId, interval: Interval): RDD[VertexId]
+
+  final def activatedEntities(interval: Interval): (RDD[VertexId], RDD[EdgeId]) = {
+    (activatedVertices(interval), activatedEdges(interval))
+  }
+
+  /**
+   * Return the ids of vertices that were either
+   * activated or created in the given interval
+   *
+   * @param interval Inclusive interval
+   * @return Tuple with the activated entities
+   */
+  def activatedVertices(interval: Interval): RDD[VertexId]
+
+  /**
+   * Return the ids of edges that were either
+   * activated or created in the given interval
+   *
+   * @param interval Inclusive interval
+   * @return Tuple with the activated entities
+   */
+  def activatedEdges(interval: Interval): RDD[EdgeId]
 }
