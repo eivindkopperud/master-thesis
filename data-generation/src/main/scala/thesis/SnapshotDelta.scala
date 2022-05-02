@@ -22,6 +22,10 @@ class SnapshotDelta(val graphs: mutable.MutableList[Snapshot],
   override val triplets: RDD[EdgeTriplet[Attributes, SnapshotEdgePayload]] = graphs.get(0).get.graph.triplets
   val logger: Logger = getLogger
 
+  override def getVertex(vertex: VERTEX, instant: Instant): Option[(Entity, Attributes)] = ???
+
+  override def getEdge(edge: EDGE, instant: Instant): Option[(Entity, Attributes)] = ???
+
   def forwardApplyLogs(graph: AttributeGraph, logsToApply: RDD[LogTSV]): AttributeGraph = {
     Graph(
       applyVertexLogsToSnapshot(graph, logsToApply),

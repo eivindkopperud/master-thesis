@@ -3,6 +3,10 @@ package thesis
 import org.apache.spark.graphx.{EdgeRDD, EdgeTriplet, Graph, VertexId, VertexRDD}
 import org.apache.spark.rdd.RDD
 import thesis.DataTypes.{Attributes, EdgeId}
+<<<<<<< HEAD
+=======
+import thesis.Entity.{EDGE, VERTEX}
+>>>>>>> 77f3459 (Add getEntity to TemporalGraph)
 
 import java.time.Instant
 import scala.reflect.ClassTag
@@ -38,6 +42,7 @@ abstract class TemporalGraph[VD: ClassTag, ED: ClassTag] extends Serializable {
    * @param interval Inclusive interval
    * @return Tuple with the activated entities
    */
+
   final def activatedEntities(interval: Interval): (RDD[VertexId], RDD[EdgeId]) = {
     (activatedVertices(interval), activatedEdges(interval))
   }
