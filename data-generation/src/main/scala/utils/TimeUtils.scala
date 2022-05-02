@@ -14,7 +14,6 @@ object TimeUtils {
   }
 
   def getDeterministicOrderedTimestamps(amount: Int, startTime: Instant, endTime: Instant): Seq[Instant] = {
-    // 5: 1->5 = [1,2,3,4,5]
     if (amount == 1) {
       return Seq(startTime)
     }
