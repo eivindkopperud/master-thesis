@@ -26,7 +26,7 @@ object LTSV {
    * @return String representation of the LogTSV
    */
   def serializeLTSV(logEntry: LogTSV): String = {
-    val timestamp = LocalDateTime.ofInstant(logEntry.timestamp, ZoneOffset.UTC).toString + "Z"
+    val timestamp = logEntry.timestamp.toString
     val action = logEntry.action match {
       case CREATE => "CREATE"
       case UPDATE => "UPDATE"
