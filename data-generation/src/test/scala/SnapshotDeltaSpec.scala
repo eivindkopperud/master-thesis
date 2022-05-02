@@ -26,7 +26,6 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     assert(graphs.graphs.length == 2)
   }
 
-  // Can be run if "ignore" is swapped with "it"
   it should "also have the correct amount when it is time based" in {
     val updates = List(1, 1, 0, 0, 1, 1) // List of amount of updates for t_1, t_2 .. t_6
     val logs = LogFactory().buildIrregularVertexSequence(updates)
@@ -210,6 +209,30 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     assert(intervalWithV2andEdge._1.take(1).head == 2L && intervalWithV2andEdge._2.count() == 1)
 
     assert(intervalWithAll._1.collect().toSet == Set(1L, 2L) && intervalWithAll._2.count() == 1)
+  }
+
+  "Snapshot delta" can "query for direct neighbours in intervals" in {
+    implicit val sparkContext: SparkContext = spark.sparkContext // Needed for implicit conversion of Seq -> RDD
+    val edgeLogs1 = LogFactory(startTime = t1, endTime = t3).buildSingleSequenceWithDelete(EDGE(100L, 1L, 2L))
+    val edgeLogs2 = LogFactory(startTime = t2, endTime = t4).buildSingleSequence(EDGE(200L, 1L, 3L))
+    val logs = (edgeLogs1 ++ edgeLogs2).sortBy(_.timestamp)
+    val g = SnapshotDeltaObject.create(logs, SnapshotIntervalType.Count(3))
+
+    // Assertions for 1L's neighbours through time
+    assert(g.directNeighbours(1L, Interval(t1, t1)).collect().toSeq == Seq(2L))
+    assert(g.directNeighbours(1L, Interval(t2, t2)).collect().toSeq == Seq(2L, 3L))
+    assert(g.directNeighbours(1L, Interval(t2, t3)).collect().toSeq == Seq(2L, 3L))
+    assert(g.directNeighbours(1L, Interval(t4, t4)).collect().toSeq == Seq(3L))
+
+    // Assertions for 2L's neighbours through time
+    assert(g.directNeighbours(2L, Interval(t1, t1)).collect().toSeq == Seq(1L))
+    assert(g.directNeighbours(2L, Interval(t1, t3)).collect().toSeq == Seq(1L))
+    assert(g.directNeighbours(2L, Interval(t4, Instant.MAX)).collect().toSeq == Seq())
+
+    // Assertions for 3L's neighbours through time
+    assert(g.directNeighbours(3L, Interval(t1, t1)).collect().toSeq == Seq())
+    assert(g.directNeighbours(3L, Interval(t1, t2)).collect().toSeq == Seq(1L))
+
 
   }
 }

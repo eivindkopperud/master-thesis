@@ -9,6 +9,7 @@ import thesis.DataTypes.{AttributeGraph, Attributes, EdgeId}
 import thesis.Entity.{EDGE, VERTEX}
 import thesis.SnapshotDeltaObject._
 import utils.LogUtils
+
 import java.time.{Duration, Instant}
 import scala.collection.mutable.MutableList
 import scala.math.Ordered.orderingToOrdered
@@ -52,7 +53,6 @@ class SnapshotDelta(val graphs: MutableList[Snapshot],
   }
 
   override def snapshotAtTime(instant: Instant): AttributeGraph = {
-
     val closestGraph = getClosestGraph(graphs, instant)
     logger.warn(s"Instant $instant, Closest :graph${closestGraph.instant}")
     if (closestGraph.instant == instant) {
@@ -68,8 +68,28 @@ class SnapshotDelta(val graphs: MutableList[Snapshot],
       forwardApplyLogs(closestGraph.graph, logsToApply)
     }
   }
-  
-  override def directNeighbours(vertexId: VertexId, interval: Interval): RDD[VertexId] = throw new NotImplementedError()
+
+  override def directNeighbours(vertexId: VertexId, interval: Interval): RDD[VertexId] = {
+    val filteredLogs = logs.filter(log => log.action == CREATE || log.action == DELETE)
+      .filter(log => log.entity match {
+        case VERTEX(_) => false
+        case EDGE(_, srcId, dstId) => srcId == vertexId || dstId == vertexId
+      })
+    LogUtils.getEdgeLogsById(filteredLogs)
+      .map(log => log._2.size match {
+        case 1 => (log._2.toSeq(0).entity match {
+          case VERTEX(_) => throw new Exception("should not happen")
+          case EDGE(_, srcId, dstId) => if (vertexId == srcId) dstId else srcId
+        }, Interval(log._2.toSeq(0).timestamp, Instant.MAX))
+        case 2 => (log._2.toSeq(0).entity match {
+          case VERTEX(_) => throw new Exception("should not happen")
+          case EDGE(_, srcId, dstId) => if (vertexId == srcId) dstId else srcId
+        }, Interval(log._2.toSeq(0).timestamp, log._2.toSeq(1).timestamp))
+        case _ => throw new IllegalStateException("should not happen")
+      })
+      .filter(thing => interval.overlaps(thing._2))
+      .map(_._1)
+  }
 }
 
 
