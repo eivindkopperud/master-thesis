@@ -5,6 +5,7 @@ import thesis.DataTypes.{AttributeGraph, Attributes, EdgeId}
 
 import java.time.Instant
 import scala.collection.immutable
+import scala.math.Ordered.orderingToOrdered
 
 object DataTypes {
   type AttributeGraph = Graph[Attributes, SnapshotEdgePayload]
@@ -13,7 +14,19 @@ object DataTypes {
   type EdgeId = Long
 }
 
-case class Interval(start: Instant, stop: Instant)
+case class Interval(start: Instant, stop: Instant) {
+  def overlaps(other: Interval): Boolean = {
+    this.contains(other.start) || other.contains(this.start)
+  }
+
+  def contains(other: Interval): Boolean = {
+    this.start <= other.start && other.stop <= this.stop
+  }
+
+  def contains(instant: Instant): Boolean = {
+    this.start <= instant && instant <= this.stop
+  }
+}
 
 case class SnapshotEdgePayload(id: EdgeId, attributes: Attributes)
 
