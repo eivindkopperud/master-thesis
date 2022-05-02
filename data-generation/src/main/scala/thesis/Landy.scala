@@ -38,9 +38,7 @@ class Landy(graph: LandyAttributeGraph) extends TemporalGraph[LandyEntityPayload
       .groupByKey() // Group all
       .map(vertex => (vertex._1, getEarliest(vertex._2.toSeq))) // Get first local vertex
 
-    firstLocalVertices.filter(vertex =>
-      vertex._2.validFrom >= interval.start &&
-        vertex._2.validFrom <= interval.stop)
+    firstLocalVertices.filter(vertex => isInstantInInterval(vertex._2.validFrom, interval))
       .map(vertex => vertex._2.id)
   }
 
@@ -49,10 +47,8 @@ class Landy(graph: LandyAttributeGraph) extends TemporalGraph[LandyEntityPayload
       .map(edge => (edge.attr.id, edge.attr))
       .groupByKey()
       .map(edge => (edge._1, getEarliest(edge._2.toSeq)))
-      .filter(edge =>
-        edge._2.validFrom >= interval.start &&
-          edge._2.validFrom <= interval.stop
-      ).map(edge => edge._1)
+      .filter(edge => isInstantInInterval(edge._2.validFrom, interval))
+      .map(edge => edge._1)
   }
 
   /**
@@ -72,6 +68,10 @@ class Landy(graph: LandyAttributeGraph) extends TemporalGraph[LandyEntityPayload
    */
   private def localVertices: VertexRDD[LandyEntityPayload] = {
     this.vertices.filter(vertex => vertex._2 != null)
+  }
+
+  private def isInstantInInterval(instant: Instant, interval: Interval): Boolean = {
+    instant >= interval.start && instant <= interval.stop
   }
 }
 
