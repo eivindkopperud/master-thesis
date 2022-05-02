@@ -1,10 +1,10 @@
 package thesis
 
-import org.apache.spark.rdd.RDD
-import thesis.DataTypes.{EdgeId, LandyAttributeGraph}
 import org.apache.spark.SparkContext
 import org.apache.spark.graphx.{Edge, EdgeRDD, EdgeTriplet, Graph, VertexId, VertexRDD}
+import org.apache.spark.rdd.RDD
 import thesis.Action.{CREATE, UPDATE}
+import thesis.DataTypes.{Attributes, EdgeId, LandyAttributeGraph}
 import utils.{LogUtils, UtilsUtils}
 
 import java.time.Instant
@@ -71,6 +71,10 @@ class Landy(graph: LandyAttributeGraph) extends TemporalGraph[LandyEntityPayload
   private def localVertices: VertexRDD[LandyEntityPayload] = {
     this.vertices.filter(vertex => vertex._2 != null)
   }
+
+  override def getVertex(vertex: Entity.VERTEX, instant: Instant): Option[(Entity, Attributes)] = ???
+
+  override def getEdge(edge: Entity.EDGE, instant: Instant): Option[(Entity, Attributes)] = ???
 }
 
 object Landy {

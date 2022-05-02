@@ -2,7 +2,8 @@ package thesis
 
 import org.apache.spark.graphx.{EdgeRDD, EdgeTriplet, Graph, VertexId, VertexRDD}
 import org.apache.spark.rdd.RDD
-import thesis.DataTypes.EdgeId
+import thesis.DataTypes.{Attributes, EdgeId}
+import thesis.Entity.{EDGE, VERTEX}
 
 import java.time.Instant
 import scala.reflect.ClassTag
@@ -29,6 +30,23 @@ abstract class TemporalGraph[VD: ClassTag, ED: ClassTag] extends Serializable {
    * @return The ids of all the neighbours of the queried vertex
    */
   def directNeighbours(vertexId: VertexId, interval: Interval): RDD[VertexId]
+
+  /** Return entity based on ID at a timestamp
+   *
+   * @param entity    Edge or Vertex
+   * @param timestamp Insant
+   * @return Entity Object and HashMap
+   */
+  final def getEntity(entity: Entity, timestamp: Instant): Option[(Entity, Attributes)] = {
+    entity match {
+      case v: VERTEX => getVertex(v, timestamp)
+      case e: EDGE => getEdge(e, timestamp)
+    }
+  }
+
+  def getVertex(vertex: VERTEX, instant: Instant): Option[(Entity, Attributes)]
+
+  def getEdge(edge: EDGE, instant: Instant): Option[(Entity, Attributes)]
 
   final def activatedEntities(interval: Interval): (RDD[VertexId], RDD[EdgeId]) = {
     (activatedVertices(interval), activatedEdges(interval))
