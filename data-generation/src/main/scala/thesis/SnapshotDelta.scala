@@ -9,6 +9,7 @@ import thesis.DataTypes.{AttributeGraph, Attributes, EdgeId}
 import thesis.Entity.{EDGE, VERTEX}
 import thesis.SnapshotDeltaObject._
 import utils.LogUtils
+
 import java.time.{Duration, Instant}
 import scala.collection.mutable.MutableList
 import scala.math.Ordered.orderingToOrdered
@@ -21,10 +22,6 @@ class SnapshotDelta(val graphs: MutableList[Snapshot],
   override val edges: EdgeRDD[SnapshotEdgePayload] = graphs.get(0).get.graph.edges
   override val triplets: RDD[EdgeTriplet[Attributes, SnapshotEdgePayload]] = graphs.get(0).get.graph.triplets
   val logger: Logger = getLogger
-
-  override def getVertex(vertex: VERTEX, instant: Instant): Option[(Entity, Attributes)] = ???
-
-  override def getEdge(edge: EDGE, instant: Instant): Option[(Entity, Attributes)] = ???
 
   def forwardApplyLogs(graph: AttributeGraph, logsToApply: RDD[LogTSV]): AttributeGraph = {
     Graph(
@@ -72,8 +69,43 @@ class SnapshotDelta(val graphs: MutableList[Snapshot],
       forwardApplyLogs(closestGraph.graph, logsToApply)
     }
   }
-  
+
   override def directNeighbours(vertexId: VertexId, interval: Interval): RDD[VertexId] = throw new NotImplementedError()
+
+  // Possibly smarter way
+  // No tests written yet
+  def getVertexSmart(vertex: VERTEX, instant: Instant): Option[(Entity, Attributes)] = {
+    val Snapshot(graph, graphInstant) = getClosestGraph(graphs, instant)
+
+    for {
+      materializedVertex <- graph.vertices.lookup(vertex.objId).headOption
+      relevantLogs = getLogsInInterval(logs, Interval(graphInstant, instant))
+      squashedLog <- getSquashedActionsByVertexId(relevantLogs).lookup(vertex.objId).headOption
+      if squashedLog.action != Action.DELETE // Incredibly ugly
+    } yield
+      squashedLog.action match {
+        case Action.CREATE => throw new IllegalStateException("This should not happen")
+        case Action.UPDATE => (vertex, rightWayMergeHashMap(materializedVertex, squashedLog.attributes))
+      }
+  }
+
+  // Naive way
+  override def getVertex(vertex: VERTEX, instant: Instant): Option[(Entity, Attributes)] =
+    snapshotAtTime(instant)
+      .vertices
+      .filter(_._1 == vertex.objId)
+      .take(1).headOption
+      .map(v => (vertex, v._2))
+
+
+  // Naive way
+  override def getEdge(edge: EDGE, instant: Instant): Option[(Entity, Attributes)] =
+    snapshotAtTime(instant)
+      .edges
+      .filter(_.attr.id == edge.id) // I think this and the next lines could be a reduce instead of filter.take.head
+      .take(1)
+      .headOption
+      .map(e => (edge, e.attr.attributes)) // Notice how we map on an Option type, pretty nifty
 }
 
 

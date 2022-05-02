@@ -212,4 +212,21 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     assert(intervalWithAll._1.collect().toSet == Set(1L, 2L) && intervalWithAll._2.count() == 1)
 
   }
+
+  "getVertex" should "retrieve the correct entity at the right timestamp" in {
+    implicit val sparkContext: SparkContext = spark.sparkContext
+
+    val v = VERTEX(1)
+    val create = LogFactory()
+      .getOne
+      .copy(timestamp = 0, entity = v, action = CREATE)
+    val update = create.copy(timestamp = 2, action = UPDATE)
+    val logs = Seq(create, update)
+
+    val g = SnapshotDeltaObject.create(logs, SnapshotIntervalType.Time(3))
+    val getV = g.getVertex(v, 1)
+    val getVAfterUpdate = g.getVertex(v, 3)
+    assert(getV.get._2 == create.attributes)
+    assert(getVAfterUpdate.get._2 == update.attributes)
+  }
 }
