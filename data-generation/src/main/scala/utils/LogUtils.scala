@@ -12,7 +12,7 @@ object LogUtils {
    * @param logs Unprocessed logs for both vertices and edges.
    * @return A RDD of all vertices by id along with their respective logs.
    */
-  def getVertexLogsById(logs: RDD[LogTSV]): RDD[(VertexId, Iterable[LogTSV])] = {
+  def groupVertexLogsById(logs: RDD[LogTSV]): RDD[(VertexId, Iterable[LogTSV])] = {
     // Filter out edge actions
     val vertexIdWithVertexActions = logs.flatMap(log => log.entity match {
       case VERTEX(id) => Some(id, log)
@@ -39,7 +39,7 @@ object LogUtils {
    * @param logs logs
    * @return A RDD of all edges by id along with their respective logs.
    */
-  def getEdgeLogsById(logs: RDD[LogTSV]): RDD[(Long, Iterable[LogTSV])] = {
+  def groupEdgeLogsById(logs: RDD[LogTSV]): RDD[(Long, Iterable[LogTSV])] = {
     // Filter out vertex actions
     val edgeIdWithEdgeActions = logs.flatMap(log => log.entity match {
       case _: VERTEX => None

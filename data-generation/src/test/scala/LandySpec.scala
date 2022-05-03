@@ -21,7 +21,7 @@ class LandySpec extends AnyFlatSpec with SparkTestWrapper {
   it can "give a snapshot" in {
     val landy: Landy = new Landy(createGraph())
 
-    val graph = landy.snapshotAtTime(LandyGraphFactory.t2)
+    val graph = landy.snapshotAtTime(t2)
 
     assert(graph.vertices.count() == 2)
     assert(graph.edges.count() == 1)

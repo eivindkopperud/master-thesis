@@ -5,6 +5,7 @@ import org.apache.spark.sql.SparkSession
 import thesis.DataTypes.LandyAttributeGraph
 import thesis.SparkConfiguration.getSparkSession
 import thesis.LandyEntityPayload
+import utils.TimeUtils.{t1, t2, t3}
 
 import java.time.Instant
 import scala.collection.immutable.HashMap
@@ -18,10 +19,6 @@ object LandyGraphFactory {
 
     Graph(vertices, edges)
   }
-
-  val t1 = Instant.parse("2000-01-01T00:00:00.000Z")
-  val t2 = Instant.parse("2001-01-01T00:00:00.000Z")
-  val t3 = Instant.parse("2002-01-01T00:00:00.000Z")
 
   def getVertices(): Seq[(VertexId, LandyEntityPayload)] = {
     Seq(

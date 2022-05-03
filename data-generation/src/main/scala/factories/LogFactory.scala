@@ -47,6 +47,12 @@ case class LogFactory(
     create ++ updates
   }
 
+  def buildSingleSequenceWithDelete(entity: Entity, updateAmount: Int = 5): Seq[LogTSV] = {
+    val sequence = buildSingleSequence(entity, updateAmount)
+    val lastActionButWithDeleteInstead = sequence.last.copy(action = DELETE)
+    sequence.init :+ lastActionButWithDeleteInstead
+  }
+
   /** Fine grained control on number of updates and when they happen
    *
    * eg. [5,0,3]
