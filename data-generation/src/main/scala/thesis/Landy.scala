@@ -35,10 +35,10 @@ class Landy(graph: LandyAttributeGraph) extends TemporalGraph[LandyEntityPayload
   override def directNeighbours(vertexId: VertexId, interval: Interval): RDD[VertexId] = {
     this.edges.filter(edge => {
       val edgeInterval = Interval(edge.attr.validFrom, edge.attr.validTo)
-      edge.srcId == vertexId && interval.overlaps(edgeInterval)
+      (edge.srcId == vertexId || edge.dstId == vertexId) && interval.overlaps(edgeInterval)
     }
     )
-      .map(_.dstId)
+      .map(edge => if (edge.dstId == vertexId) edge.srcId else edge.dstId)
   }
 
   override def activatedVertices(interval: Interval): RDD[VertexId] = {
