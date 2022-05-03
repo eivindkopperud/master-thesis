@@ -133,9 +133,13 @@ class SnapshotDelta(val graphs: mutable.MutableList[Snapshot],
   // Thinking about moving these two functions to another file. Thoughts?
   def getMaterializedEntity[T <: Entity](entity: T, instant: Instant, snapshot: Snapshot): Option[(T, Attributes)] = {
     val Snapshot(graph, mInstant) = snapshot
-    val possibleVertexAttributes = graph.vertices.lookup(entity.id).headOption
+    val possibleVertexAttributes = entity match {
+      case _: VERTEX => graph.vertices.lookup(entity.id).headOption
+      case _: EDGE => graph.edges.map(e => (e.attr.id, e)).lookup(entity.id).headOption.map(_.attr.attributes)
+    }
+
     val relevantLogs = LogUtils.filterEntityLogsById(getLogsInInterval(logs, Interval(mInstant, instant)), entity)
-    val possibleLog = getSquashedActionsByVertexId(relevantLogs).lookup(entity.id).headOption
+    val possibleLog = getPossibleSquashedLogForEntity(relevantLogs, entity)
     (possibleVertexAttributes, possibleLog) match {
       case (Some(vertexAttributes), Some(log)) => log.action match {
         case Action.CREATE => throw new IllegalStateException("The entity existed in the last snapshot, thus not CREATE can exist here")
@@ -154,7 +158,7 @@ class SnapshotDelta(val graphs: mutable.MutableList[Snapshot],
 
   def getUnmaterializedEntity[T <: Entity](entity: T, instant: Instant): Option[(T, Attributes)] = {
     val relevantLogs = LogUtils.filterEntityLogsById(getLogsInInterval(logs, Interval(Instant.MIN, instant)), entity)
-    val possibleLog = getSquashedActionsByVertexId(relevantLogs).lookup(entity.id).headOption
+    val possibleLog = getPossibleSquashedLogForEntity(relevantLogs, entity)
     possibleLog match {
       case Some(log) => log.action match {
         case Action.CREATE => Some(entity, log.attributes)
@@ -165,23 +169,12 @@ class SnapshotDelta(val graphs: mutable.MutableList[Snapshot],
     }
   }
 
-  // Will be deleted, but is included for testing purposes ( I know this one works )
-  def getVertexNaive(vertex: VERTEX, instant: Instant): Option[(Entity, Attributes)] =
-    snapshotAtTime(instant)
-      .vertices
-      .filter(_._1 == vertex.id)
-      .take(1).headOption
-      .map(v => (vertex, v._2))
-
-
-  // Naive way
-  def getEdgeNaive(edge: EDGE, instant: Instant): Option[(Entity, Attributes)] =
-    snapshotAtTime(instant)
-      .edges
-      .filter(_.attr.id == edge.id) // I think this and the next lines could be a reduce instead of filter.take.head
-      .take(1)
-      .headOption
-      .map(e => (edge, e.attr.attributes)) // Notice how we map on an Option type, pretty nifty
+  def getPossibleSquashedLogForEntity(logs: RDD[LogTSV], entity: Entity): Option[LogTSV] = {
+    entity match {
+      case _: VERTEX => getSquashedActionsByVertexId(logs).lookup(entity.id).headOption
+      case _: EDGE => getSquashedActionsByEdgeId(logs).lookup(entity.id).headOption
+    }
+  }
 }
 
 

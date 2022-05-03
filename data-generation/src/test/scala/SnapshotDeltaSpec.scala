@@ -235,14 +235,14 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
 
   }
 
-  "getVertex" should "retrieve the correct entity at the right timestamp" in {
+  "getEntity[Vertex]" should "retrieve the correct vertex at the right timestamp" in {
     implicit val sparkContext: SparkContext = spark.sparkContext
 
     val v = VERTEX(1)
     val create = LogFactory()
       .getOne
       .copy(timestamp = 0, entity = v, action = CREATE)
-    val update = create.copy(timestamp = 2, action = UPDATE)
+    val update = LogFactory().getOne.copy(entity = v, timestamp = 2, action = UPDATE)
     val logs = Seq(create, update)
 
     val g = SnapshotDeltaObject.create(logs, SnapshotIntervalType.Time(3))
@@ -251,5 +251,23 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     val getVAfterUpdate = g.getEntity(v, 3)
     assert(getV.get._2 == create.attributes)
     assert(getVAfterUpdate.get._2 == update.attributes)
+  }
+
+  "getEntity[Edge]" should "retrieve the correct edge at the right timestamp" in {
+    implicit val sparkContext: SparkContext = spark.sparkContext
+    val lf = LogFactory()
+
+    val edge = EDGE(8, 1, 2)
+    val eCreate = lf.getOne.copy(entity = edge, action = CREATE, timestamp = 0)
+    val eUpdate = lf.getOne.copy(entity = edge, action = UPDATE, timestamp = 2)
+    val v1 = LogFactory(startTime = 0L, endTime = 10L).buildSingleSequence(VERTEX(1))
+    val v2 = LogFactory(startTime = 0L, endTime = 10L).buildSingleSequence(VERTEX(2))
+    val logs = (Seq(eCreate, eUpdate) ++ v1 ++ v2).sortBy(_.timestamp)
+
+    val g = SnapshotDeltaObject.create(logs, SnapshotIntervalType.Time(3))
+    val getEdge = g.getEntity(edge, 1)
+    val getEdgeAfterUpdate = g.getEntity(edge, 3)
+    assert(getEdge.get._2 == eCreate.attributes)
+    assert(getEdgeAfterUpdate.get._2 == eUpdate.attributes)
   }
 }
