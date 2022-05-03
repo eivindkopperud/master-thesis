@@ -6,6 +6,7 @@ import org.apache.spark.rdd.RDD
 import thesis.Action.{CREATE, UPDATE}
 import thesis.DataTypes.{Attributes, EdgeId, LandyAttributeGraph}
 import utils.{EntityFilterException, LogUtils, UtilsUtils}
+import thesis.Entity.VERTEX
 
 import java.time.Instant
 import scala.collection.mutable
@@ -79,13 +80,25 @@ class Landy(graph: LandyAttributeGraph) extends TemporalGraph[LandyEntityPayload
     this.vertices.filter(vertex => vertex._2 != null)
   }
 
-  /** Return entity based on ID at a timestamp
-   *
-   * @param entity    Edge or Vertex
-   * @param timestamp Insant
-   * @return Entity Object and HashMap
-   */
   override def getEntity[T <: Entity](entity: T, timestamp: Instant): Option[(T, Attributes)] = ???
+
+  override def getVertex(vertex: Entity.VERTEX, instant: Instant): Option[(Entity, Attributes)] = {
+    this.vertices
+      .filter(v => v._2.id == vertex.objId)
+      .filter(v => v._2.interval.contains(instant))
+      .map(v => (VERTEX(v._2.id), v._2.attributes))
+      .collect()
+      .headOption
+  }
+
+  override def getEdge(edge: Entity.EDGE, instant: Instant): Option[(Entity, Attributes)] = {
+    this.edges
+      .filter(e => e.attr.id == edge.id)
+      .filter(e => e.attr.interval.contains(instant))
+      .map(e => (edge, e.attr.attributes))
+      .collect()
+      .headOption
+  }
 }
 
 object Landy {
