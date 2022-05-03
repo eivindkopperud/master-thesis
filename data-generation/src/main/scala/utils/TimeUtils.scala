@@ -6,6 +6,16 @@ import java.time.Instant
 import scala.language.implicitConversions
 
 object TimeUtils {
+  val t1: Instant = Instant.parse("2000-01-01T00:00:00Z")
+  val t2: Instant = Instant.parse("2000-01-01T01:00:00Z")
+  val t3: Instant = Instant.parse("2000-01-01T02:00:00Z")
+  val t4: Instant = Instant.parse("2000-01-01T03:00:00Z")
+  val t5: Instant = Instant.parse("2000-01-01T04:00:00Z")
+  val t6: Instant = Instant.parse("2000-01-01T05:00:00Z")
+  val t7: Instant = Instant.parse("2000-01-01T06:00:00Z")
+  val t8: Instant = Instant.parse("2000-01-01T07:00:00Z")
+
+
   def getRandomOrderedTimestamps(amount: Int, startTime: Instant, endTime: Instant): Seq[Instant] = {
     Uniform(startTime.getEpochSecond, endTime.getEpochSecond)
       .sample(amount)

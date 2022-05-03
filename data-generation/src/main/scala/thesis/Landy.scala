@@ -5,7 +5,7 @@ import thesis.DataTypes.{EdgeId, LandyAttributeGraph}
 import org.apache.spark.SparkContext
 import org.apache.spark.graphx.{Edge, EdgeRDD, EdgeTriplet, Graph, VertexId, VertexRDD}
 import thesis.Action.{CREATE, UPDATE}
-import utils.{LogUtils, UtilsUtils}
+import utils.{EntityFilterException, LogUtils, UtilsUtils}
 
 import java.time.Instant
 import scala.collection.mutable
@@ -76,7 +76,7 @@ class Landy(graph: LandyAttributeGraph) extends TemporalGraph[LandyEntityPayload
 object Landy {
   def createEdge(log: LogTSV, validTo: Instant): Edge[LandyEntityPayload] = {
     log.entity match {
-      case Entity.VERTEX(_) => throw new IllegalStateException("This should not be called on a log with vertices")
+      case Entity.VERTEX(_) => throw new EntityFilterException
       case Entity.EDGE(id, srcId, dstId) => {
         val payload = LandyEntityPayload(id = id, validFrom = log.timestamp, validTo = validTo, attributes = log.attributes)
         Edge(srcId, dstId, payload)
@@ -90,7 +90,7 @@ object Landy {
         val payload = LandyEntityPayload(id = objId, validFrom = log.timestamp, validTo = validTo, attributes = log.attributes)
         (UtilsUtils.uuid, payload)
       }
-      case Entity.EDGE(_, _, _) => throw new IllegalStateException("This should not be called on a log with edges")
+      case Entity.EDGE(_, _, _) => throw new EntityFilterException
     }
   }
 
@@ -125,9 +125,9 @@ object Landy {
   }
 
   def apply(logs: RDD[LogTSV])(implicit sc: SparkContext): Landy = {
-    val edges = LogUtils.getEdgeLogsById(logs)
+    val edges = LogUtils.groupEdgeLogsById(logs)
       .flatMap(actionsByEdge => generateEdges(actionsByEdge._2.toSeq))
-    val vertices = LogUtils.getVertexLogsById(logs)
+    val vertices = LogUtils.groupVertexLogsById(logs)
       .flatMap(actionsByVertex => generateVertices(actionsByVertex._2.toSeq))
 
     val graph = Graph(vertices, edges)

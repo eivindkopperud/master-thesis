@@ -8,7 +8,8 @@ import thesis.Action.{CREATE, DELETE, UPDATE}
 import thesis.DataTypes.{AttributeGraph, Attributes, EdgeId}
 import thesis.Entity.{EDGE, VERTEX}
 import thesis.SnapshotDeltaObject._
-import utils.LogUtils
+import utils.{EntityFilterException, LogUtils}
+
 import java.time.{Duration, Instant}
 import scala.collection.mutable.MutableList
 import scala.math.Ordered.orderingToOrdered
@@ -52,7 +53,6 @@ class SnapshotDelta(val graphs: MutableList[Snapshot],
   }
 
   override def snapshotAtTime(instant: Instant): AttributeGraph = {
-
     val closestGraph = getClosestGraph(graphs, instant)
     logger.warn(s"Instant $instant, Closest :graph${closestGraph.instant}")
     if (closestGraph.instant == instant) {
@@ -68,8 +68,29 @@ class SnapshotDelta(val graphs: MutableList[Snapshot],
       forwardApplyLogs(closestGraph.graph, logsToApply)
     }
   }
-  
-  override def directNeighbours(vertexId: VertexId, interval: Interval): RDD[VertexId] = throw new NotImplementedError()
+
+  override def directNeighbours(vertexId: VertexId, interval: Interval): RDD[VertexId] = {
+    val filteredEdgeLogs = logs.filter(log => log.action == CREATE || log.action == DELETE)
+      .filter(log => log.entity match {
+        case _: VERTEX => false
+        case EDGE(_, srcId, dstId) => srcId == vertexId || dstId == vertexId
+      })
+
+    LogUtils.groupEdgeLogsById(filteredEdgeLogs)
+      .map(log => log._2.map(_.action) match {
+        case CREATE :: Nil => (log._2.toSeq(0).entity match {
+          case _: VERTEX => throw new EntityFilterException
+          case EDGE(_, srcId, dstId) => if (vertexId == srcId) dstId else srcId
+        }, Interval(log._2.toSeq(0).timestamp, Instant.MAX))
+        case CREATE :: DELETE :: Nil => (log._2.toSeq(0).entity match { // We assume the the logs are sorted and that DELETE::CREATE can not happen
+          case _: VERTEX => throw new EntityFilterException
+          case EDGE(_, srcId, dstId) => if (vertexId == srcId) dstId else srcId
+        }, Interval(log._2.toSeq(0).timestamp, log._2.toSeq(1).timestamp))
+        case _ => throw new IllegalStateException(s"Only CREATE or CREATE+DELETE allowed here.")
+      })
+      .filter(idWithInterval => interval.overlaps(idWithInterval._2))
+      .map(_._1)
+  }
 }
 
 
@@ -182,13 +203,13 @@ object SnapshotDeltaObject {
 
   def logToEdge(log: LogTSV): Edge[SnapshotEdgePayload] = {
     log.entity match {
-      case _: VERTEX => throw new IllegalStateException("This does not make sense. Only edges allowed")
+      case _: VERTEX => throw new EntityFilterException
       case EDGE(id, srcId, dstId) => Edge(srcId, dstId, SnapshotEdgePayload(id, log.attributes))
     }
   }
 
   def getSquashedActionsByEdgeId(logs: RDD[LogTSV]): RDD[(Long, LogTSV)] = {
-    LogUtils.getEdgeLogsById(logs)
+    LogUtils.groupEdgeLogsById(logs)
       .map(edgeWithActions => (edgeWithActions._1, mergeLogTSVs(edgeWithActions._2)))
 
   }
@@ -224,7 +245,7 @@ object SnapshotDeltaObject {
   }
 
   def getSquashedActionsByVertexId(logs: RDD[LogTSV]): RDD[(VertexId, LogTSV)] = {
-    LogUtils.getVertexLogsById(logs)
+    LogUtils.groupVertexLogsById(logs)
       .map(vertexWithActions => (vertexWithActions._1, mergeLogTSVs(vertexWithActions._2)))
   }
 
@@ -305,6 +326,4 @@ object SnapshotDeltaObject {
     } else {
       snapshot2
     }
-
-
 }
