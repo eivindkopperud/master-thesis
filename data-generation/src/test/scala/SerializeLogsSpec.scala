@@ -1,7 +1,7 @@
 import factories.LogFactory
 import org.scalatest.flatspec.AnyFlatSpec
-import thesis.Entity.VERTEX
 import thesis.LTSV.{deserializeLTSV, deserializeList, serializeLTSV, serializeList}
+import thesis.VERTEX
 
 class SerializeLogsSpec extends AnyFlatSpec {
 

@@ -1,10 +1,10 @@
 package thesis
 
-import org.apache.spark.rdd.RDD
-import thesis.DataTypes.{EdgeId, LandyAttributeGraph}
 import org.apache.spark.SparkContext
 import org.apache.spark.graphx.{Edge, EdgeRDD, EdgeTriplet, Graph, VertexId, VertexRDD}
+import org.apache.spark.rdd.RDD
 import thesis.Action.{CREATE, UPDATE}
+import thesis.DataTypes.{Attributes, EdgeId, LandyAttributeGraph}
 import utils.{EntityFilterException, LogUtils, UtilsUtils}
 
 import java.time.Instant
@@ -71,13 +71,21 @@ class Landy(graph: LandyAttributeGraph) extends TemporalGraph[LandyEntityPayload
   private def localVertices: VertexRDD[LandyEntityPayload] = {
     this.vertices.filter(vertex => vertex._2 != null)
   }
+
+  /** Return entity based on ID at a timestamp
+   *
+   * @param entity    Edge or Vertex
+   * @param timestamp Insant
+   * @return Entity Object and HashMap
+   */
+  override def getEntity[T <: Entity](entity: T, timestamp: Instant): Option[(T, Attributes)] = ???
 }
 
 object Landy {
   def createEdge(log: LogTSV, validTo: Instant): Edge[LandyEntityPayload] = {
     log.entity match {
-      case Entity.VERTEX(_) => throw new EntityFilterException
-      case Entity.EDGE(id, srcId, dstId) => {
+      case VERTEX(_) => throw new EntityFilterException
+      case EDGE(id, srcId, dstId) => {
         val payload = LandyEntityPayload(id = id, validFrom = log.timestamp, validTo = validTo, attributes = log.attributes)
         Edge(srcId, dstId, payload)
       }
@@ -86,11 +94,11 @@ object Landy {
 
   def createVertex(log: LogTSV, validTo: Instant): (VertexId, LandyEntityPayload) = {
     log.entity match {
-      case Entity.VERTEX(objId) => {
-        val payload = LandyEntityPayload(id = objId, validFrom = log.timestamp, validTo = validTo, attributes = log.attributes)
+      case VERTEX(id) => {
+        val payload = LandyEntityPayload(id = id, validFrom = log.timestamp, validTo = validTo, attributes = log.attributes)
         (UtilsUtils.uuid, payload)
       }
-      case Entity.EDGE(_, _, _) => throw new EntityFilterException
+      case EDGE(_, _, _) => throw new EntityFilterException
     }
   }
 

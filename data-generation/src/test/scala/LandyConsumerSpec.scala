@@ -1,8 +1,7 @@
 import factories.LogFactory
 import org.apache.spark.SparkContext
 import org.scalatest.flatspec.AnyFlatSpec
-import thesis.Entity.{EDGE, VERTEX}
-import thesis.Landy
+import thesis.{EDGE, Landy, VERTEX}
 import wrappers.SparkTestWrapper
 
 class LandyConsumerSpec extends AnyFlatSpec with SparkTestWrapper {

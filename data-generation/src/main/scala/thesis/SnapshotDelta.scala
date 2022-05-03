@@ -6,16 +6,15 @@ import org.apache.spark.rdd.RDD.rddToOrderedRDDFunctions
 import org.slf4j.{Logger, LoggerFactory}
 import thesis.Action.{CREATE, DELETE, UPDATE}
 import thesis.DataTypes.{AttributeGraph, Attributes, EdgeId}
-import thesis.Entity.{EDGE, VERTEX}
 import thesis.SnapshotDeltaObject._
 import utils.{EntityFilterException, LogUtils}
 
 import java.time.{Duration, Instant}
-import scala.collection.mutable.MutableList
-import scala.math.Ordered.orderingToOrdered
+import scala.collection.mutable
+import scala.math.Ordering.Implicits.infixOrderingOps
 import scala.util.Try
 
-class SnapshotDelta(val graphs: MutableList[Snapshot],
+class SnapshotDelta(val graphs: mutable.MutableList[Snapshot],
                     val logs: RDD[LogTSV],
                     val snapshotType: SnapshotIntervalType) extends TemporalGraph[Attributes, SnapshotEdgePayload] {
   override val vertices: VertexRDD[Attributes] = graphs.get(0).get.graph.vertices
@@ -30,13 +29,28 @@ class SnapshotDelta(val graphs: MutableList[Snapshot],
     )
   }
 
-  def getClosestGraph(graphs: Seq[Snapshot], instant: Instant): Snapshot =
-    graphs.reduceLeft((snap1, snap2) =>
-      if (snap2.instant > instant) {
+  /** Get most recent materialized snapshot
+   * Meaning only retrieve snapshots materialized before the given instant
+   * This is because we have no way of backwards applying graph
+   *
+   * @param graphs  List of graphs that we assume is non-empty
+   * @param instant the given instant
+   * @return Possibly a snapshot if it makes sense
+   */
+  def getMostRecentMaterializedSnapshot(graphs: Seq[Snapshot], instant: Instant): Option[Snapshot] = {
+    val graph = graphs.reduceLeft((snap1, snap2) =>
+      if (instant.isBefore(snap2.instant)) {
         snap1
       } else {
         snap2
       })
+    if (instant.isBefore(graph.instant)) {
+      None // The instant is in the interval before any graphs have been materialized
+    } else {
+      Some(graph)
+    }
+
+  }
 
   override def activatedVertices(interval: Interval): RDD[VertexId] = {
     val relevantLogs = getLogsInInterval(logs, interval)
@@ -53,19 +67,22 @@ class SnapshotDelta(val graphs: MutableList[Snapshot],
   }
 
   override def snapshotAtTime(instant: Instant): AttributeGraph = {
-    val closestGraph = getClosestGraph(graphs, instant)
-    logger.warn(s"Instant $instant, Closest :graph${closestGraph.instant}")
-    if (closestGraph.instant == instant) {
-      logger.warn("The queried graph is already materialized")
-      closestGraph.graph
-    } else if (instant < closestGraph.instant) {
-      logger.warn("Closest graph in the future, and there is no one in the past.")
-      val initialLogs = getLogsInInterval(logs, Interval(Instant.MIN, instant))
-      createGraph(initialLogs)
-    } else {
-      logger.warn("Closest graph is in the past. Need to apply logs forwards")
-      val logsToApply = getLogsInInterval(logs, Interval(closestGraph.instant, instant))
-      forwardApplyLogs(closestGraph.graph, logsToApply)
+
+    val mostRecentMaterializedSnapshot = getMostRecentMaterializedSnapshot(graphs, instant)
+    mostRecentMaterializedSnapshot match {
+      case Some(snapshot) =>
+        if (snapshot.instant == instant) {
+          logger.warn("The queried graph is already materialized")
+          snapshot.graph
+        } else {
+          logger.warn("Closest graph is in the past. Need to apply logs forwards")
+          val logsToApply = getLogsInInterval(logs, Interval(snapshot.instant, instant))
+          forwardApplyLogs(snapshot.graph, logsToApply)
+        }
+      case None =>
+        logger.warn("Closest graph in the future, and there is no one in the past.")
+        val initialLogs = getLogsInInterval(logs, Interval(Instant.MIN, instant))
+        createGraph(initialLogs)
     }
   }
 
@@ -90,6 +107,72 @@ class SnapshotDelta(val graphs: MutableList[Snapshot],
       })
       .filter(idWithInterval => interval.overlaps(idWithInterval._2))
       .map(_._1)
+  }
+
+  /** get entity at a certain point in time
+   *
+   * This method shares a lot of functionality with getting a snapshot at a specific time,
+   * but only for a single entity. A lot has been duplicated because we try to only include relevant
+   * logs and save processing with this. (Through benchmarking its roughly 60% faster than just using
+   * snapshotAtTime() and filtering the specific entity)
+   *
+   * Does not support getEdges using src and dstId, that would have to be another function
+   *
+   * @param entity  entity to be found
+   * @param instant that specific time
+   * @return Possibly the desired entity if it exists at the time
+   */
+  override def getEntity[T <: Entity](entity: T, instant: Instant): Option[(T, Attributes)] = {
+    val possibleMaterializedSnapshot = getMostRecentMaterializedSnapshot(graphs, instant)
+    possibleMaterializedSnapshot match {
+      case Some(snapshot) => getMaterializedEntity(entity, instant, snapshot)
+      case None => getUnmaterializedEntity(entity, instant)
+    }
+  }
+
+  def getMaterializedEntity[T <: Entity](entity: T, instant: Instant, snapshot: Snapshot): Option[(T, Attributes)] = {
+    val Snapshot(graph, materializedInstant) = snapshot
+    val possibleEntityAttributes = entity match {
+      case _: VERTEX => graph.vertices.lookup(entity.id).headOption
+      case _: EDGE => graph.edges.map(e => (e.attr.id, e)).lookup(entity.id).headOption.map(_.attr.attributes)
+    }
+
+    val relevantLogs = LogUtils.filterEntityLogsById(getLogsInInterval(logs, Interval(materializedInstant, instant)), entity)
+    val possibleLog = getPossibleSquashedLogForEntity(relevantLogs, entity)
+    (possibleEntityAttributes, possibleLog) match {
+      case (Some(entityAttributes), Some(log)) => log.action match {
+        case Action.CREATE => throw new IllegalStateException("The entity existed in the last snapshot, thus not CREATE can exist here")
+        case Action.UPDATE => Some(entity, rightWayMergeHashMap(entityAttributes, log.attributes))
+        case Action.DELETE => None // Entity was deleted
+      }
+      case (Some(entityAttributes), None) => Some((entity, entityAttributes))
+      case (None, Some(log)) => log.action match { // Entity was created in the interval
+        case Action.CREATE => Some(entity, log.attributes)
+        case Action.UPDATE => throw new IllegalStateException("The entity didn't exist in the last snapshot, therefore no UPDATE can exist")
+        case Action.DELETE => None // Entity was created and promptly deleted
+      }
+      case (None, None) => None // The entity never existed in interval between materialized snapshot and instant
+    }
+  }
+
+  def getUnmaterializedEntity[T <: Entity](entity: T, instant: Instant): Option[(T, Attributes)] = {
+    val relevantLogs = LogUtils.filterEntityLogsById(getLogsInInterval(logs, Interval(Instant.MIN, instant)), entity)
+    val possibleLog = getPossibleSquashedLogForEntity(relevantLogs, entity)
+    possibleLog match {
+      case Some(log) => log.action match {
+        case Action.CREATE => Some(entity, log.attributes)
+        case Action.UPDATE => throw new IllegalStateException("If it's unmaterialized then there has to be a CREATE")
+        case Action.DELETE => None // The entity has been deleted
+      }
+      case None => None // The entity never existed in the interval (Instant.min,instant)
+    }
+  }
+
+  def getPossibleSquashedLogForEntity(logs: RDD[LogTSV], entity: Entity): Option[LogTSV] = {
+    entity match {
+      case _: VERTEX => getSquashedActionsByVertexId(logs).lookup(entity.id).headOption
+      case _: EDGE => getSquashedActionsByEdgeId(logs).lookup(entity.id).headOption
+    }
   }
 }
 
@@ -128,7 +211,7 @@ object SnapshotDeltaObject {
     val initLogs = logsWithSortableKey.filterByRange(min, interval - 1).map(_._2)
     val initTimestamp = initLogs.map(_.timestamp).max()
     val initialGraph = createGraph(initLogs)
-    val graphs = MutableList(Snapshot(initialGraph, initTimestamp))
+    val graphs = mutable.MutableList(Snapshot(initialGraph, initTimestamp))
 
     for (i <- 1 until numberOfSnapShots) {
       val previousSnapshot = graphs(i - 1)

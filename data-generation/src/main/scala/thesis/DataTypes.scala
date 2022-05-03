@@ -87,13 +87,13 @@ object Action {
   final case object DELETE extends Action
 }
 
-sealed abstract class Entity
-
-object Entity {
-  final case class VERTEX(objId: Long) extends Entity
-
-  final case class EDGE(id: Long, srcId: Long, dstId: Long) extends Entity
+sealed trait Entity {
+  def id: Long
 }
+
+final case class VERTEX(override val id: Long) extends Entity
+
+final case class EDGE(override val id: Long, srcId: Long, dstId: Long) extends Entity
 
 /** LogTSV
  *

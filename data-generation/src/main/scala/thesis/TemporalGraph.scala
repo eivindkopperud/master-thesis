@@ -2,7 +2,7 @@ package thesis
 
 import org.apache.spark.graphx.{EdgeRDD, EdgeTriplet, Graph, VertexId, VertexRDD}
 import org.apache.spark.rdd.RDD
-import thesis.DataTypes.EdgeId
+import thesis.DataTypes.{Attributes, EdgeId}
 
 import java.time.Instant
 import scala.reflect.ClassTag
@@ -14,12 +14,6 @@ abstract class TemporalGraph[VD: ClassTag, ED: ClassTag] extends Serializable {
 
   def snapshotAtTime(instant: Instant): Graph[VD, ED]
 
-  /** Return the ids of the entities that were either
-   * activated or created in the interval
-   *
-   * @param interval Inclusive interval
-   * @return Tuple with the activated entities
-   */
 
   /**
    * Get all vertices that were in contact with the given vertexId at any time in the interval
@@ -30,6 +24,20 @@ abstract class TemporalGraph[VD: ClassTag, ED: ClassTag] extends Serializable {
    */
   def directNeighbours(vertexId: VertexId, interval: Interval): RDD[VertexId]
 
+  /** Return entity based on ID at a timestamp
+   *
+   * @param entity    Edge or Vertex
+   * @param timestamp Insant
+   * @return Entity Object and HashMap
+   */
+  def getEntity[T <: Entity](entity: T, timestamp: Instant): Option[(T, Attributes)]
+
+  /** Return the ids of the entities that were either
+   * activated or created in the interval
+   *
+   * @param interval Inclusive interval
+   * @return Tuple with the activated entities
+   */
   final def activatedEntities(interval: Interval): (RDD[VertexId], RDD[EdgeId]) = {
     (activatedVertices(interval), activatedEdges(interval))
   }
