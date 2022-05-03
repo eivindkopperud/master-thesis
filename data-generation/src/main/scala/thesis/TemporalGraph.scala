@@ -3,10 +3,6 @@ package thesis
 import org.apache.spark.graphx.{EdgeRDD, EdgeTriplet, Graph, VertexId, VertexRDD}
 import org.apache.spark.rdd.RDD
 import thesis.DataTypes.{Attributes, EdgeId}
-<<<<<<< HEAD
-=======
-import thesis.Entity.{EDGE, VERTEX}
->>>>>>> 77f3459 (Add getEntity to TemporalGraph)
 
 import java.time.Instant
 import scala.reflect.ClassTag

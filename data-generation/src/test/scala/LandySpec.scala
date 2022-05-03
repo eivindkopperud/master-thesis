@@ -7,6 +7,7 @@ import thesis.{EDGE, VERTEX}
 import utils.TimeUtils
 import utils.TimeUtils.{t1, t2, t3, t4}
 import wrappers.SparkTestWrapper
+import thesis.{EDGE, VERTEX}
 
 import java.time.Instant
 

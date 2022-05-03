@@ -82,6 +82,7 @@ class Landy(graph: LandyAttributeGraph) extends TemporalGraph[LandyEntityPayload
   override def getEntity[T <: Entity](entity: T, timestamp: Instant): Option[(T, Attributes)] = ???
 
   def getVertex(vertex: VERTEX, instant: Instant): Option[(Entity, Attributes)] = {
+
     localVertices
       .filter(v => v._2.id == vertex.id)
       .filter(v => v._2.interval.contains(instant))
@@ -103,7 +104,7 @@ class Landy(graph: LandyAttributeGraph) extends TemporalGraph[LandyEntityPayload
 object Landy {
   def createEdge(log: LogTSV, validTo: Instant): Edge[LandyEntityPayload] = {
     log.entity match {
-      case VERTEX(_) => throw new EntityFilterException
+      case _: VERTEX => throw new EntityFilterException
       case EDGE(id, srcId, dstId) => {
         val payload = LandyEntityPayload(id = id, validFrom = log.timestamp, validTo = validTo, attributes = log.attributes)
         Edge(srcId, dstId, payload)
@@ -117,7 +118,7 @@ object Landy {
         val payload = LandyEntityPayload(id = id, validFrom = log.timestamp, validTo = validTo, attributes = log.attributes)
         (UtilsUtils.uuid, payload)
       }
-      case EDGE(_, _, _) => throw new EntityFilterException
+      case _: EDGE => throw new EntityFilterException
     }
   }
 
