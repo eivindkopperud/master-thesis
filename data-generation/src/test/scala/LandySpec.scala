@@ -1,9 +1,10 @@
 import factories.LandyGraphFactory.createGraph
-import factories.{LandyGraphFactory, LogFactory}
+import factories.LogFactory
 import org.apache.spark.SparkContext
 import org.scalatest.flatspec.AnyFlatSpec
 import thesis.{EDGE, Interval, Landy, VERTEX}
 import utils.TimeUtils
+import utils.TimeUtils.t2
 import wrappers.SparkTestWrapper
 
 import java.time.Instant
