@@ -223,8 +223,9 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     val logs = Seq(create, update)
 
     val g = SnapshotDeltaObject.create(logs, SnapshotIntervalType.Time(3))
-    val getV = g.getVertex(v, 1)
-    val getVAfterUpdate = g.getVertex(v, 3)
+    // TODO write tests for edges
+    val getV = g.getEntity(v, 1)
+    val getVAfterUpdate = g.getEntity(v, 3)
     assert(getV.get._2 == create.attributes)
     assert(getVAfterUpdate.get._2 == update.attributes)
   }

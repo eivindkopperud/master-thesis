@@ -23,17 +23,15 @@ object LogUtils {
     vertexIdWithVertexActions.groupByKey()
   }
 
-  /** Get only the logs relevant for a specific vertex
+  /** Get only the logs relevant for a specific entity
    *
    * @param logs   logs
-   * @param vertex specific vertex
+   * @param entity specific entity
    * @return RDD with the relevant logs
    */
-  def filterVertexLogsById(logs: RDD[LogTSV], vertex: VERTEX): RDD[LogTSV] =
-    logs.flatMap(log => log.entity match {
-      case VERTEX(objId) if objId == vertex.objId => Some(log)
-      case _: EDGE => None
-    })
+  def filterEntityLogsById(logs: RDD[LogTSV], entity: Entity): RDD[LogTSV] =
+    logs.flatMap(log => if (log.entity == entity) Some(log) else None)
+
 
   /**
    * Order all logs as key-value pairs, with edge ids as the key and a list of corresponding logs as the value.

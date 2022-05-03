@@ -30,16 +30,7 @@ abstract class TemporalGraph[VD: ClassTag, ED: ClassTag] extends Serializable {
    * @param timestamp Insant
    * @return Entity Object and HashMap
    */
-  final def getEntity(entity: Entity, timestamp: Instant): Option[(Entity, Attributes)] = {
-    entity match {
-      case v: VERTEX => getVertex(v, timestamp)
-      case e: EDGE => getEdge(e, timestamp)
-    }
-  }
-
-  def getVertex(vertex: VERTEX, instant: Instant): Option[(Entity, Attributes)]
-
-  def getEdge(edge: EDGE, instant: Instant): Option[(Entity, Attributes)]
+  def getEntity[T <: Entity](entity: T, timestamp: Instant): Option[(T, Attributes)]
 
   /** Return the ids of the entities that were either
    * activated or created in the interval

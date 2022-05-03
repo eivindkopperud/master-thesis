@@ -91,54 +91,56 @@ class SnapshotDelta(val graphs: mutable.MutableList[Snapshot],
   /** get Vertex at a certain point in time
    *
    * This method shares a lot of functionality with getting a snapshot at a specific time,
-   * but only for a single vertex. A lot has been duplicated because we try to only include relevant
+   * but only for a single entity. A lot has been duplicated because we try to only include relevant
    * logs and save processing with this. (Through benchmarking its roughly 60% faster than just using
-   * snapshotAtTime() and filtering the specific vertex)
+   * snapshotAtTime() and filtering the specific entity)
    *
-   * @param vertex  vertex to be found
+   * Does not support getEdges using src and dstId, that would have to be another function
+   *
+   * @param entity  entity to be found
    * @param instant that specific time
    * @return Possibly vertex if it exists at the time
    */
-  def getVertex(vertex: VERTEX, instant: Instant): Option[(Entity, Attributes)] = {
+  override def getEntity[T <: Entity](entity: T, instant: Instant): Option[(T, Attributes)] = {
     val possibleMaterializedSnapshot = getMostRecentMaterializedSnapshot(graphs, instant)
     possibleMaterializedSnapshot match {
-      case Some(snapshot) => getMaterializedVertex(vertex, instant, snapshot)
-      case None => getUnmaterializedVertex(vertex, instant)
+      case Some(snapshot) => getMaterializedEntity(entity, instant, snapshot)
+      case None => getUnmaterializedEntity(entity, instant)
     }
   }
 
   // Thinking about moving these two functions to another file. Thoughts?
-  def getMaterializedVertex(vertex: VERTEX, instant: Instant, snapshot: Snapshot): Option[(VERTEX, Attributes)] = {
+  def getMaterializedEntity[T <: Entity](entity: T, instant: Instant, snapshot: Snapshot): Option[(T, Attributes)] = {
     val Snapshot(graph, mInstant) = snapshot
-    val possibleVertexAttributes = graph.vertices.lookup(vertex.objId).headOption
-    val relevantLogs = LogUtils.filterVertexLogsById(getLogsInInterval(logs, Interval(mInstant, instant)), vertex)
-    val possibleLog = getSquashedActionsByVertexId(relevantLogs).lookup(vertex.objId).headOption
+    val possibleVertexAttributes = graph.vertices.lookup(entity.id).headOption
+    val relevantLogs = LogUtils.filterEntityLogsById(getLogsInInterval(logs, Interval(mInstant, instant)), entity)
+    val possibleLog = getSquashedActionsByVertexId(relevantLogs).lookup(entity.id).headOption
     (possibleVertexAttributes, possibleLog) match {
       case (Some(vertexAttributes), Some(log)) => log.action match {
-        case Action.CREATE => throw new IllegalStateException("The vertex existed in the last snapshot, thus not CREATE can exist here")
-        case Action.UPDATE => Some(vertex, rightWayMergeHashMap(vertexAttributes, log.attributes))
+        case Action.CREATE => throw new IllegalStateException("The entity existed in the last snapshot, thus not CREATE can exist here")
+        case Action.UPDATE => Some(entity, rightWayMergeHashMap(vertexAttributes, log.attributes))
         case Action.DELETE => None // Vertex was deleted
       }
-      case (Some(vertexAttributes), None) => Some((vertex, vertexAttributes))
+      case (Some(vertexAttributes), None) => Some((entity, vertexAttributes))
       case (None, Some(log)) => log.action match { // Vertex was created in the interval
-        case Action.CREATE => Some(vertex, log.attributes)
-        case Action.UPDATE => throw new IllegalStateException("The vertex didn't exist in the last snapshot, therefore no UPDATE can exist")
+        case Action.CREATE => Some(entity, log.attributes)
+        case Action.UPDATE => throw new IllegalStateException("The entity didn't exist in the last snapshot, therefore no UPDATE can exist")
         case Action.DELETE => None // Vertex was created and promptly deleted
       }
       case (None, None) => None // The vertex never existed in interval between materialized snapshot and instant
     }
   }
 
-  def getUnmaterializedVertex(vertex: VERTEX, instant: Instant): Option[(Entity, Attributes)] = {
-    val relevantLogs = LogUtils.filterVertexLogsById(getLogsInInterval(logs, Interval(Instant.MIN, instant)), vertex)
-    val possibleLog = getSquashedActionsByVertexId(relevantLogs).lookup(vertex.objId).headOption
+  def getUnmaterializedEntity[T <: Entity](entity: T, instant: Instant): Option[(T, Attributes)] = {
+    val relevantLogs = LogUtils.filterEntityLogsById(getLogsInInterval(logs, Interval(Instant.MIN, instant)), entity)
+    val possibleLog = getSquashedActionsByVertexId(relevantLogs).lookup(entity.id).headOption
     possibleLog match {
       case Some(log) => log.action match {
-        case Action.CREATE => Some(vertex, log.attributes)
+        case Action.CREATE => Some(entity, log.attributes)
         case Action.UPDATE => throw new IllegalStateException("If it's unmaterialized then there has to be a CREATE")
-        case Action.DELETE => None // The vertex has been deleted
+        case Action.DELETE => None // The entity has been deleted
       }
-      case None => None // The vertex never existed in the interval (Instant.min,instant)
+      case None => None // The entity never existed in the interval (Instant.min,instant)
     }
   }
 
@@ -152,7 +154,7 @@ class SnapshotDelta(val graphs: mutable.MutableList[Snapshot],
 
 
   // Naive way
-  override def getEdge(edge: EDGE, instant: Instant): Option[(Entity, Attributes)] =
+  def getEdgeNaive(edge: EDGE, instant: Instant): Option[(Entity, Attributes)] =
     snapshotAtTime(instant)
       .edges
       .filter(_.attr.id == edge.id) // I think this and the next lines could be a reduce instead of filter.take.head
