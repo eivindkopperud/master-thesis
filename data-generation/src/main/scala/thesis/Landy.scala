@@ -80,8 +80,8 @@ class Landy(graph: LandyAttributeGraph) extends TemporalGraph[LandyEntityPayload
 object Landy {
   def createEdge(log: LogTSV, validTo: Instant): Edge[LandyEntityPayload] = {
     log.entity match {
-      case Entity.VERTEX(_) => throw new IllegalStateException("This should not be called on a log with vertices")
-      case Entity.EDGE(id, srcId, dstId) => {
+      case VERTEX(_) => throw new IllegalStateException("This should not be called on a log with vertices")
+      case EDGE(id, srcId, dstId) => {
         val payload = LandyEntityPayload(id = id, validFrom = log.timestamp, validTo = validTo, attributes = log.attributes)
         Edge(srcId, dstId, payload)
       }
@@ -90,11 +90,11 @@ object Landy {
 
   def createVertex(log: LogTSV, validTo: Instant): (VertexId, LandyEntityPayload) = {
     log.entity match {
-      case Entity.VERTEX(objId) => {
-        val payload = LandyEntityPayload(id = objId, validFrom = log.timestamp, validTo = validTo, attributes = log.attributes)
+      case VERTEX(id) => {
+        val payload = LandyEntityPayload(id = id, validFrom = log.timestamp, validTo = validTo, attributes = log.attributes)
         (UtilsUtils.uuid, payload)
       }
-      case Entity.EDGE(_, _, _) => throw new IllegalStateException("This should not be called on a log with edges")
+      case EDGE(_, _, _) => throw new IllegalStateException("This should not be called on a log with edges")
     }
   }
 

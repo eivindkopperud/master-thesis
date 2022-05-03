@@ -6,7 +6,6 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers.be
 import org.scalatest.matchers.should.Matchers.a
 import thesis.Action.{CREATE, DELETE, UPDATE}
-import thesis.Entity.{EDGE, VERTEX}
 import thesis.SnapshotDeltaObject.{applyVertexLogsToSnapshot, createGraph, getSquashedActionsByVertexId, mergeLogTSV}
 import thesis.SnapshotIntervalType.{Count, Time}
 import thesis._

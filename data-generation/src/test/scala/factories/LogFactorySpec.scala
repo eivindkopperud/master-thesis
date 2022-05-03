@@ -2,7 +2,7 @@ package factories
 
 import org.scalatest.flatspec.AnyFlatSpec
 import thesis.Action.{CREATE, UPDATE}
-import thesis.Entity.VERTEX
+import thesis.VERTEX
 
 class LogFactorySpec extends AnyFlatSpec {
 

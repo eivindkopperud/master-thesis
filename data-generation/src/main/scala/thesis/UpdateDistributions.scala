@@ -9,7 +9,6 @@ import org.apache.spark.rdd.RDD
 import org.slf4j.{Logger, LoggerFactory}
 import thesis.Action.{CREATE, DELETE}
 import thesis.DistributionType.{LogNormalType, UniformType}
-import thesis.Entity.EDGE
 
 import java.nio.file.{Files, Paths}
 import scala.reflect.ClassTag

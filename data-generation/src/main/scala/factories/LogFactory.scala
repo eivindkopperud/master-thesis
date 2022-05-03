@@ -4,8 +4,7 @@ import com.github.javafaker.Faker
 import org.apache.spark.graphx.VertexId
 import thesis.Action.{CREATE, DELETE, UPDATE}
 import thesis.DataTypes.Attributes
-import thesis.Entity.{EDGE, VERTEX}
-import thesis.{Action, Entity, LogTSV}
+import thesis.{Action, EDGE, Entity, LogTSV, VERTEX}
 import utils.TimeUtils
 
 import java.time.Instant

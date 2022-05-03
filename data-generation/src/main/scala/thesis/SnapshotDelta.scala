@@ -6,7 +6,6 @@ import org.apache.spark.rdd.RDD.rddToOrderedRDDFunctions
 import org.slf4j.{Logger, LoggerFactory}
 import thesis.Action.{CREATE, DELETE, UPDATE}
 import thesis.DataTypes.{AttributeGraph, Attributes, EdgeId}
-import thesis.Entity.{EDGE, VERTEX}
 import thesis.SnapshotDeltaObject._
 import utils.LogUtils
 
@@ -147,7 +146,7 @@ class SnapshotDelta(val graphs: mutable.MutableList[Snapshot],
   def getVertexNaive(vertex: VERTEX, instant: Instant): Option[(Entity, Attributes)] =
     snapshotAtTime(instant)
       .vertices
-      .filter(_._1 == vertex.objId)
+      .filter(_._1 == vertex.id)
       .take(1).headOption
       .map(v => (vertex, v._2))
 

@@ -3,9 +3,8 @@ package thesis
 import org.apache.spark.rdd.RDD
 import thesis.Action.{CREATE, DELETE, UPDATE}
 import thesis.DataTypes.Attributes
-import thesis.Entity.{EDGE, VERTEX}
 
-import java.time.{Instant, LocalDateTime, ZoneOffset}
+import java.time.Instant
 import scala.collection.immutable
 import scala.io.Source
 import scala.util.Try

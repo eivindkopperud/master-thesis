@@ -2,8 +2,7 @@ package utils
 
 import org.apache.spark.graphx.VertexId
 import org.apache.spark.rdd.RDD
-import thesis.Entity.{EDGE, VERTEX}
-import thesis.LogTSV
+import thesis.{EDGE, Entity, LogTSV, VERTEX}
 
 object LogUtils {
 
@@ -16,7 +15,7 @@ object LogUtils {
   def getVertexLogsById(logs: RDD[LogTSV]): RDD[(VertexId, Iterable[LogTSV])] = {
     // Filter out edge actions
     val vertexIdWithVertexActions = logs.flatMap(log => log.entity match {
-      case VERTEX(objId) => Some(objId, log)
+      case VERTEX(id) => Some(id, log)
       case _: EDGE => None
     })
 

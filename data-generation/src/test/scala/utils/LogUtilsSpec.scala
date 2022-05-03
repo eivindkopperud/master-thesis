@@ -2,7 +2,7 @@ package utils
 
 import factories.LogFactory
 import org.scalatest.flatspec.AnyFlatSpec
-import thesis.Entity.{EDGE, VERTEX}
+import thesis.{EDGE, VERTEX}
 import wrappers.SparkTestWrapper
 
 class LogUtilsSpec extends AnyFlatSpec with SparkTestWrapper {
