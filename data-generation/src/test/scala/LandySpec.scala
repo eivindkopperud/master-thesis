@@ -1,12 +1,12 @@
 import factories.LandyGraphFactory.createGraph
 import thesis.{Interval, Landy}
 import org.scalatest.flatspec.AnyFlatSpec
-import wrappers.SparkTestWrapper
 import factories.LogFactory
 import org.apache.spark.SparkContext
 import thesis.{EDGE, VERTEX}
 import utils.TimeUtils
 import utils.TimeUtils.{t1, t2, t3, t4}
+import wrappers.SparkTestWrapper
 
 import java.time.Instant
 
