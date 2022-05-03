@@ -20,7 +20,7 @@ import scala.concurrent.duration.NANOSECONDS
  * @param writer    IoC, write to file or to console
  * @param inSeconds if seconds is the preferred output unit of time (Could actually just be removed)
  */
-case class Benchmark(writer: Writer, inSeconds: Boolean = false, var textPrefix: String = "unset") {
+case class Benchmark(writer: Writer, inSeconds: Boolean = false, textPrefix: String) {
   val header = "function,value,timeunit,number of runs"
 
 
