@@ -109,7 +109,7 @@ class SnapshotDelta(val graphs: mutable.MutableList[Snapshot],
       .map(_._1)
   }
 
-  /** get Vertex at a certain point in time
+  /** get entity at a certain point in time
    *
    * This method shares a lot of functionality with getting a snapshot at a specific time,
    * but only for a single entity. A lot has been duplicated because we try to only include relevant
@@ -120,7 +120,7 @@ class SnapshotDelta(val graphs: mutable.MutableList[Snapshot],
    *
    * @param entity  entity to be found
    * @param instant that specific time
-   * @return Possibly vertex if it exists at the time
+   * @return Possibly the desired entity if it exists at the time
    */
   override def getEntity[T <: Entity](entity: T, instant: Instant): Option[(T, Attributes)] = {
     val possibleMaterializedSnapshot = getMostRecentMaterializedSnapshot(graphs, instant)
@@ -130,29 +130,28 @@ class SnapshotDelta(val graphs: mutable.MutableList[Snapshot],
     }
   }
 
-  // Thinking about moving these two functions to another file. Thoughts?
   def getMaterializedEntity[T <: Entity](entity: T, instant: Instant, snapshot: Snapshot): Option[(T, Attributes)] = {
-    val Snapshot(graph, mInstant) = snapshot
-    val possibleVertexAttributes = entity match {
+    val Snapshot(graph, materializedInstant) = snapshot
+    val possibleEntityAttributes = entity match {
       case _: VERTEX => graph.vertices.lookup(entity.id).headOption
       case _: EDGE => graph.edges.map(e => (e.attr.id, e)).lookup(entity.id).headOption.map(_.attr.attributes)
     }
 
-    val relevantLogs = LogUtils.filterEntityLogsById(getLogsInInterval(logs, Interval(mInstant, instant)), entity)
+    val relevantLogs = LogUtils.filterEntityLogsById(getLogsInInterval(logs, Interval(materializedInstant, instant)), entity)
     val possibleLog = getPossibleSquashedLogForEntity(relevantLogs, entity)
-    (possibleVertexAttributes, possibleLog) match {
-      case (Some(vertexAttributes), Some(log)) => log.action match {
+    (possibleEntityAttributes, possibleLog) match {
+      case (Some(entityAttributes), Some(log)) => log.action match {
         case Action.CREATE => throw new IllegalStateException("The entity existed in the last snapshot, thus not CREATE can exist here")
-        case Action.UPDATE => Some(entity, rightWayMergeHashMap(vertexAttributes, log.attributes))
-        case Action.DELETE => None // Vertex was deleted
+        case Action.UPDATE => Some(entity, rightWayMergeHashMap(entityAttributes, log.attributes))
+        case Action.DELETE => None // Entity was deleted
       }
-      case (Some(vertexAttributes), None) => Some((entity, vertexAttributes))
-      case (None, Some(log)) => log.action match { // Vertex was created in the interval
+      case (Some(entityAttributes), None) => Some((entity, entityAttributes))
+      case (None, Some(log)) => log.action match { // Entity was created in the interval
         case Action.CREATE => Some(entity, log.attributes)
         case Action.UPDATE => throw new IllegalStateException("The entity didn't exist in the last snapshot, therefore no UPDATE can exist")
-        case Action.DELETE => None // Vertex was created and promptly deleted
+        case Action.DELETE => None // Entity was created and promptly deleted
       }
-      case (None, None) => None // The vertex never existed in interval between materialized snapshot and instant
+      case (None, None) => None // The entity never existed in interval between materialized snapshot and instant
     }
   }
 
