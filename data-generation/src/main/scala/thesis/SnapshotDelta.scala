@@ -70,20 +70,20 @@ class SnapshotDelta(val graphs: MutableList[Snapshot],
   }
 
   override def directNeighbours(vertexId: VertexId, interval: Interval): RDD[VertexId] = {
-    val filteredLogs = logs.filter(log => log.action == CREATE || log.action == DELETE)
+    val filteredEdgeLogs = logs.filter(log => log.action == CREATE || log.action == DELETE)
       .filter(log => log.entity match {
-        case VERTEX(_) => false
+        case _: VERTEX => false
         case EDGE(_, srcId, dstId) => srcId == vertexId || dstId == vertexId
       })
 
-    LogUtils.getEdgeLogsById(filteredLogs)
-      .map(log => log._2.size match { // The corresponding actions should either be (CREATE) or (CREATE+DELETE)
-        case 1 => (log._2.toSeq(0).entity match { // The action is (CREATE) - the edge is never deleted
-          case VERTEX(_) => throw new EntityFilterException
+    LogUtils.groupEdgeLogsById(filteredEdgeLogs)
+      .map(log => log._2.map(_.action) match {
+        case CREATE :: Nil => (log._2.toSeq(0).entity match {
+          case _: VERTEX => throw new EntityFilterException
           case EDGE(_, srcId, dstId) => if (vertexId == srcId) dstId else srcId
         }, Interval(log._2.toSeq(0).timestamp, Instant.MAX))
-        case 2 => (log._2.toSeq(0).entity match { // The actions are (CREATE+DELETE) - the edge is deleted
-          case VERTEX(_) => throw new EntityFilterException
+        case CREATE :: DELETE :: Nil => (log._2.toSeq(0).entity match { // We assume the the logs are sorted and that DELETE::CREATE can not happen
+          case _: VERTEX => throw new EntityFilterException
           case EDGE(_, srcId, dstId) => if (vertexId == srcId) dstId else srcId
         }, Interval(log._2.toSeq(0).timestamp, log._2.toSeq(1).timestamp))
         case _ => throw new IllegalStateException(s"Only CREATE or CREATE+DELETE allowed here.")
@@ -209,7 +209,7 @@ object SnapshotDeltaObject {
   }
 
   def getSquashedActionsByEdgeId(logs: RDD[LogTSV]): RDD[(Long, LogTSV)] = {
-    LogUtils.getEdgeLogsById(logs)
+    LogUtils.groupEdgeLogsById(logs)
       .map(edgeWithActions => (edgeWithActions._1, mergeLogTSVs(edgeWithActions._2)))
 
   }
@@ -245,7 +245,7 @@ object SnapshotDeltaObject {
   }
 
   def getSquashedActionsByVertexId(logs: RDD[LogTSV]): RDD[(VertexId, LogTSV)] = {
-    LogUtils.getVertexLogsById(logs)
+    LogUtils.groupVertexLogsById(logs)
       .map(vertexWithActions => (vertexWithActions._1, mergeLogTSVs(vertexWithActions._2)))
   }
 

@@ -125,9 +125,9 @@ object Landy {
   }
 
   def apply(logs: RDD[LogTSV])(implicit sc: SparkContext): Landy = {
-    val edges = LogUtils.getEdgeLogsById(logs)
+    val edges = LogUtils.groupEdgeLogsById(logs)
       .flatMap(actionsByEdge => generateEdges(actionsByEdge._2.toSeq))
-    val vertices = LogUtils.getVertexLogsById(logs)
+    val vertices = LogUtils.groupVertexLogsById(logs)
       .flatMap(actionsByVertex => generateVertices(actionsByVertex._2.toSeq))
 
     val graph = Graph(vertices, edges)
