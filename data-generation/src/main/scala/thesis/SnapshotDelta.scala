@@ -11,11 +11,11 @@ import thesis.SnapshotDeltaObject._
 import utils.LogUtils
 
 import java.time.{Duration, Instant}
-import scala.collection.mutable.MutableList
-import scala.math.Ordered.orderingToOrdered
+import scala.collection.mutable
+import scala.math.Ordering.Implicits.infixOrderingOps
 import scala.util.Try
 
-class SnapshotDelta(val graphs: MutableList[Snapshot],
+class SnapshotDelta(val graphs: mutable.MutableList[Snapshot],
                     val logs: RDD[LogTSV],
                     val snapshotType: SnapshotIntervalType) extends TemporalGraph[Attributes, SnapshotEdgePayload] {
   override val vertices: VertexRDD[Attributes] = graphs.get(0).get.graph.vertices
@@ -162,7 +162,7 @@ object SnapshotDeltaObject {
     val initLogs = logsWithSortableKey.filterByRange(min, interval - 1).map(_._2)
     val initTimestamp = initLogs.map(_.timestamp).max()
     val initialGraph = createGraph(initLogs)
-    val graphs = MutableList(Snapshot(initialGraph, initTimestamp))
+    val graphs = mutable.MutableList(Snapshot(initialGraph, initTimestamp))
 
     for (i <- 1 until numberOfSnapShots) {
       val previousSnapshot = graphs(i - 1)
