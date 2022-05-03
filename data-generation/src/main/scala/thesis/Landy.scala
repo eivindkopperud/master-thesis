@@ -83,7 +83,7 @@ class Landy(graph: LandyAttributeGraph) extends TemporalGraph[LandyEntityPayload
   override def getEntity[T <: Entity](entity: T, timestamp: Instant): Option[(T, Attributes)] = ???
 
   override def getVertex(vertex: Entity.VERTEX, instant: Instant): Option[(Entity, Attributes)] = {
-    this.vertices
+    localVertices
       .filter(v => v._2.id == vertex.objId)
       .filter(v => v._2.interval.contains(instant))
       .map(v => (VERTEX(v._2.id), v._2.attributes))

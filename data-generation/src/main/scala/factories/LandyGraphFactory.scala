@@ -19,7 +19,7 @@ object LandyGraphFactory {
 
     Graph(vertices, edges)
   }
-
+  
   def getVertices(): Seq[(VertexId, LandyEntityPayload)] = {
     Seq(
       (1000L,
@@ -69,11 +69,11 @@ object LandyGraphFactory {
       ),
       Edge(1L, 2L,
         LandyEntityPayload(
-          id = 1004L,
+          id = 1003L,
           validFrom = t2,
           validTo = t3,
           attributes = HashMap(
-            "relation" -> "brother"
+            "relation" -> "sister"
           )
         )
       )

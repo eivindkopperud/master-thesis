@@ -1,0 +1,15 @@
+function,value,timeunit,number of runs,number of logs
+Snapshot,-55,ms,5,2
+Snapshot,-42,ms,5,4
+Snapshot,-27,ms,5,8
+Snapshot,-41,ms,5,16
+Snapshot,-46,ms,5,32
+Snapshot,-23,ms,5,64
+Snapshot,-20,ms,5,128
+Snapshot,-12,ms,5,256
+Snapshot,-8,ms,5,512
+Snapshot,-9,ms,5,1024
+Snapshot,-12,ms,5,2048
+Snapshot,-11,ms,5,4096
+Snapshot,-11,ms,5,8192
+Snapshot,-15,ms,5,16384
