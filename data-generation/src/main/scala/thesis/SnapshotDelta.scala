@@ -71,7 +71,7 @@ class SnapshotDelta(val graphs: mutable.MutableList[Snapshot],
 
     val mostRecentMaterializedSnapshot = getMostRecentMaterializedSnapshot(graphs, instant)
     mostRecentMaterializedSnapshot match {
-      case Some(snapshot) => {
+      case Some(snapshot) =>
         if (snapshot.instant == instant) {
           logger.warn("The queried graph is already materialized")
           snapshot.graph
@@ -80,36 +80,71 @@ class SnapshotDelta(val graphs: mutable.MutableList[Snapshot],
           val logsToApply = getLogsInInterval(logs, Interval(snapshot.instant, instant))
           forwardApplyLogs(snapshot.graph, logsToApply)
         }
-      }
-      case None => {
+      case None =>
         logger.warn("Closest graph in the future, and there is no one in the past.")
         val initialLogs = getLogsInInterval(logs, Interval(Instant.MIN, instant))
         createGraph(initialLogs)
-      }
     }
   }
 
   override def directNeighbours(vertexId: VertexId, interval: Interval): RDD[VertexId] = throw new NotImplementedError()
 
-  // Possibly smarter way
-  // No tests written yet
-  def getVertexSmart(vertex: VERTEX, instant: Instant): Option[(Entity, Attributes)] = {
-    val Snapshot(graph, graphInstant) = getClosestGraph(graphs, instant)
-
-    for {
-      materializedVertex <- graph.vertices.lookup(vertex.objId).headOption
-      relevantLogs = getLogsInInterval(logs, Interval(graphInstant, instant))
-      squashedLog <- getSquashedActionsByVertexId(relevantLogs).lookup(vertex.objId).headOption
-      if squashedLog.action != Action.DELETE // Incredibly ugly
-    } yield
-      squashedLog.action match {
-        case Action.CREATE => throw new IllegalStateException("This should not happen")
-        case Action.UPDATE => (vertex, rightWayMergeHashMap(materializedVertex, squashedLog.attributes))
-      }
+  /** get Vertex at a certain point in time
+   *
+   * This method shares a lot of functionality with getting a snapshot at a specific time,
+   * but only for a single vertex. A lot has been duplicated because we try to only include relevant
+   * logs and save processing with this. (Through benchmarking its roughly 60% faster than just using
+   * snapshotAtTime() and filtering the specific vertex)
+   *
+   * @param vertex  vertex to be found
+   * @param instant that specific time
+   * @return Possibly vertex if it exists at the time
+   */
+  def getVertex(vertex: VERTEX, instant: Instant): Option[(Entity, Attributes)] = {
+    val possibleMaterializedSnapshot = getMostRecentMaterializedSnapshot(graphs, instant)
+    possibleMaterializedSnapshot match {
+      case Some(snapshot) => getMaterializedVertex(vertex, instant, snapshot)
+      case None => getUnmaterializedVertex(vertex, instant)
+    }
   }
 
-  // Naive way
-  override def getVertex(vertex: VERTEX, instant: Instant): Option[(Entity, Attributes)] =
+  // Thinking about moving these two functions to another file. Thoughts?
+  def getMaterializedVertex(vertex: VERTEX, instant: Instant, snapshot: Snapshot): Option[(VERTEX, Attributes)] = {
+    val Snapshot(graph, mInstant) = snapshot
+    val possibleVertexAttributes = graph.vertices.lookup(vertex.objId).headOption
+    val relevantLogs = LogUtils.filterVertexLogsById(getLogsInInterval(logs, Interval(mInstant, instant)), vertex)
+    val possibleLog = getSquashedActionsByVertexId(relevantLogs).lookup(vertex.objId).headOption
+    (possibleVertexAttributes, possibleLog) match {
+      case (Some(vertexAttributes), Some(log)) => log.action match {
+        case Action.CREATE => throw new IllegalStateException("The vertex existed in the last snapshot, thus not CREATE can exist here")
+        case Action.UPDATE => Some(vertex, rightWayMergeHashMap(vertexAttributes, log.attributes))
+        case Action.DELETE => None // Vertex was deleted
+      }
+      case (Some(vertexAttributes), None) => Some((vertex, vertexAttributes))
+      case (None, Some(log)) => log.action match { // Vertex was created in the interval
+        case Action.CREATE => Some(vertex, log.attributes)
+        case Action.UPDATE => throw new IllegalStateException("The vertex didn't exist in the last snapshot, therefore no UPDATE can exist")
+        case Action.DELETE => None // Vertex was created and promptly deleted
+      }
+      case (None, None) => None // The vertex never existed in interval between materialized snapshot and instant
+    }
+  }
+
+  def getUnmaterializedVertex(vertex: VERTEX, instant: Instant): Option[(Entity, Attributes)] = {
+    val relevantLogs = LogUtils.filterVertexLogsById(getLogsInInterval(logs, Interval(Instant.MIN, instant)), vertex)
+    val possibleLog = getSquashedActionsByVertexId(relevantLogs).lookup(vertex.objId).headOption
+    possibleLog match {
+      case Some(log) => log.action match {
+        case Action.CREATE => Some(vertex, log.attributes)
+        case Action.UPDATE => throw new IllegalStateException("If it's unmaterialized then there has to be a CREATE")
+        case Action.DELETE => None // The vertex has been deleted
+      }
+      case None => None // The vertex never existed in the interval (Instant.min,instant)
+    }
+  }
+
+  // Will be deleted, but is included for testing purposes ( I know this one works )
+  def getVertexNaive(vertex: VERTEX, instant: Instant): Option[(Entity, Attributes)] =
     snapshotAtTime(instant)
       .vertices
       .filter(_._1 == vertex.objId)
