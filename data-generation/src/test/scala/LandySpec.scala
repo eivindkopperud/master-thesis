@@ -73,7 +73,8 @@ class LandySpec extends AnyFlatSpec with SparkTestWrapper {
     // Assertions for 2L's neighbours through time
     assert(g.directNeighbours(2L, Interval(t3, t3)).collect().toSeq == Seq(1L))
     assert(g.directNeighbours(2L, Interval(t4, t4)).collect().toSeq == Seq())
-
+  }
+  
   it can "query for vertex edges" in {
     val graph = new Landy(createGraph())
 

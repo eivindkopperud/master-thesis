@@ -22,10 +22,6 @@ class SnapshotDelta(val graphs: mutable.MutableList[Snapshot],
   override val triplets: RDD[EdgeTriplet[Attributes, SnapshotEdgePayload]] = graphs.get(0).get.graph.triplets
   val logger: Logger = getLogger
 
-  override def getVertex(vertex: VERTEX, instant: Instant): Option[(Entity, Attributes)] = ???
-
-  override def getEdge(edge: EDGE, instant: Instant): Option[(Entity, Attributes)] = ???
-
   def forwardApplyLogs(graph: AttributeGraph, logsToApply: RDD[LogTSV]): AttributeGraph = {
     Graph(
       applyVertexLogsToSnapshot(graph, logsToApply),
@@ -113,14 +109,14 @@ class SnapshotDelta(val graphs: mutable.MutableList[Snapshot],
       .map(_._1)
   }
 
-  /** get entity at a certain point in time
+  /** Get entity at a certain point in time
    *
    * This method shares a lot of functionality with getting a snapshot at a specific time,
    * but only for a single entity. A lot has been duplicated because we try to only include relevant
    * logs and save processing with this. (Through benchmarking its roughly 60% faster than just using
    * snapshotAtTime() and filtering the specific entity)
    *
-   * Does not support getEdges using src and dstId, that would have to be another function
+   * TODO: Support getEdges using src and dstId (in another function)
    *
    * @param entity  entity to be found
    * @param instant that specific time

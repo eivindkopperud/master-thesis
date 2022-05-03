@@ -79,19 +79,24 @@ class Landy(graph: LandyAttributeGraph) extends TemporalGraph[LandyEntityPayload
     this.vertices.filter(vertex => vertex._2 != null)
   }
 
-  override def getEntity[T <: Entity](entity: T, timestamp: Instant): Option[(T, Attributes)] = ???
+  override def getEntity[T <: Entity](entity: T, timestamp: Instant): Option[(T, Attributes)] = {
+    entity match {
+      case _: VERTEX => getVertex(entity, timestamp)
+      case _: EDGE => getEdge(entity, timestamp)
+      case _ => None
+    }
+  }
 
-  def getVertex(vertex: VERTEX, instant: Instant): Option[(Entity, Attributes)] = {
-
+  def getVertex[T <: Entity](vertex: T, instant: Instant): Option[(T, Attributes)] = {
     localVertices
       .filter(v => v._2.id == vertex.id)
       .filter(v => v._2.interval.contains(instant))
-      .map(v => (VERTEX(v._2.id), v._2.attributes))
+      .map(v => (vertex, v._2.attributes))
       .collect()
       .headOption
   }
 
-  def getEdge(edge: EDGE, instant: Instant): Option[(Entity, Attributes)] = {
+  def getEdge[T <: Entity](edge: T, instant: Instant): Option[(T, Attributes)] = {
     this.edges
       .filter(e => e.attr.id == edge.id)
       .filter(e => e.attr.interval.contains(instant))
@@ -99,6 +104,7 @@ class Landy(graph: LandyAttributeGraph) extends TemporalGraph[LandyEntityPayload
       .collect()
       .headOption
   }
+
 }
 
 object Landy {
