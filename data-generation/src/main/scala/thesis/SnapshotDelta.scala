@@ -86,7 +86,7 @@ class SnapshotDelta(val graphs: MutableList[Snapshot],
           case VERTEX(_) => throw new EntityFilterException
           case EDGE(_, srcId, dstId) => if (vertexId == srcId) dstId else srcId
         }, Interval(log._2.toSeq(0).timestamp, log._2.toSeq(1).timestamp))
-        case _ => throw new IllegalStateException(s"Only CREATE or CREATE+DELETE allowed here. Got ${_} actions")
+        case _ => throw new IllegalStateException(s"Only CREATE or CREATE+DELETE allowed here.")
       })
       .filter(idWithInterval => interval.overlaps(idWithInterval._2))
       .map(_._1)
