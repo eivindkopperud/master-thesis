@@ -30,13 +30,28 @@ class SnapshotDelta(val graphs: MutableList[Snapshot],
     )
   }
 
-  def getClosestGraph(graphs: Seq[Snapshot], instant: Instant): Snapshot =
-    graphs.reduceLeft((snap1, snap2) =>
-      if (snap2.instant > instant) {
+  /** Get most recent materialized snapshot
+   * Meaning only retrieve snapshots materialized before the given instant
+   * This is because we have no way of backwards applying graph
+   *
+   * @param graphs  List of graphs that we assume is non-empty
+   * @param instant the given instant
+   * @return Possibly a snapshot if it makes sense
+   */
+  def getMostRecentMaterializedSnapshot(graphs: Seq[Snapshot], instant: Instant): Option[Snapshot] = {
+    val graph = graphs.reduceLeft((snap1, snap2) =>
+      if (instant.isBefore(snap2.instant)) {
         snap1
       } else {
         snap2
       })
+    if (instant.isBefore(graph.instant)) {
+      None // The instant is in the interval before any graphs have been materialized
+    } else {
+      Some(graph)
+    }
+
+  }
 
   override def activatedVertices(interval: Interval): RDD[VertexId] = {
     val relevantLogs = getLogsInInterval(logs, interval)
@@ -54,19 +69,23 @@ class SnapshotDelta(val graphs: MutableList[Snapshot],
 
   override def snapshotAtTime(instant: Instant): AttributeGraph = {
 
-    val closestGraph = getClosestGraph(graphs, instant)
-    logger.warn(s"Instant $instant, Closest :graph${closestGraph.instant}")
-    if (closestGraph.instant == instant) {
-      logger.warn("The queried graph is already materialized")
-      closestGraph.graph
-    } else if (instant < closestGraph.instant) {
-      logger.warn("Closest graph in the future, and there is no one in the past.")
-      val initialLogs = getLogsInInterval(logs, Interval(Instant.MIN, instant))
-      createGraph(initialLogs)
-    } else {
-      logger.warn("Closest graph is in the past. Need to apply logs forwards")
-      val logsToApply = getLogsInInterval(logs, Interval(closestGraph.instant, instant))
-      forwardApplyLogs(closestGraph.graph, logsToApply)
+    val mostRecentMaterializedSnapshot = getMostRecentMaterializedSnapshot(graphs, instant)
+    mostRecentMaterializedSnapshot match {
+      case Some(snapshot) => {
+        if (snapshot.instant == instant) {
+          logger.warn("The queried graph is already materialized")
+          snapshot.graph
+        } else {
+          logger.warn("Closest graph is in the past. Need to apply logs forwards")
+          val logsToApply = getLogsInInterval(logs, Interval(snapshot.instant, instant))
+          forwardApplyLogs(snapshot.graph, logsToApply)
+        }
+      }
+      case None => {
+        logger.warn("Closest graph in the future, and there is no one in the past.")
+        val initialLogs = getLogsInInterval(logs, Interval(Instant.MIN, instant))
+        createGraph(initialLogs)
+      }
     }
   }
 
