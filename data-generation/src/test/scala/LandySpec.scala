@@ -63,13 +63,14 @@ class LandySpec extends AnyFlatSpec with SparkTestWrapper {
 
   it can "query direct neighbours" in {
     implicit val sparkContext: SparkContext = spark.sparkContext
-    val graph = new Landy(createGraph())
+    val g = new Landy(createGraph())
 
-    val neighboursAfterRelatedEdge = graph.directNeighbours(1L, Interval(t4, t4))
-    val neighboursWhileRelatedEdge = graph.directNeighbours(1L, Interval(t3, t3))
+    // Assertions for 1L's neighbours through time
+    assert(g.directNeighbours(1L, Interval(t3, t3)).collect().toSeq == Seq(2L))
+    assert(g.directNeighbours(1L, Interval(t4, t4)).collect().toSeq == Seq())
 
-    assert(neighboursAfterRelatedEdge.count() == 0)
-    assert(neighboursWhileRelatedEdge.count() == 1)
-    assert(neighboursWhileRelatedEdge.collect().contains(2L))
+    // Assertions for 2L's neighbours through time
+    assert(g.directNeighbours(2L, Interval(t3, t3)).collect().toSeq == Seq(1L))
+    assert(g.directNeighbours(2L, Interval(t4, t4)).collect().toSeq == Seq())
   }
 }

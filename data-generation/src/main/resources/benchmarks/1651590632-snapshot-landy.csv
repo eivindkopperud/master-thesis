@@ -1,0 +1,11 @@
+function,value,timeunit,number of runs,run number
+doStuff,43,ms,1,0
+doStuff,23,ms,1,1
+doStuff,34,ms,1,2
+doStuff,24,ms,1,3
+doStuff,23,ms,1,4
+doStuff,23,ms,1,5
+doStuff,23,ms,1,6
+doStuff,26,ms,1,7
+doStuff,31,ms,1,8
+doStuff,23,ms,1,9
