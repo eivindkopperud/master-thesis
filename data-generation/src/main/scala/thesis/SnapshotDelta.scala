@@ -8,7 +8,7 @@ import thesis.Action.{CREATE, DELETE, UPDATE}
 import thesis.DataTypes.{AttributeGraph, Attributes, EdgeId}
 import thesis.Entity.{EDGE, VERTEX}
 import thesis.SnapshotDeltaObject._
-import utils.LogUtils
+import utils.{EntityFilterException, LogUtils}
 
 import java.time.{Duration, Instant}
 import scala.collection.mutable.MutableList
@@ -75,17 +75,18 @@ class SnapshotDelta(val graphs: MutableList[Snapshot],
         case VERTEX(_) => false
         case EDGE(_, srcId, dstId) => srcId == vertexId || dstId == vertexId
       })
+
     LogUtils.getEdgeLogsById(filteredLogs)
-      .map(log => log._2.size match {
-        case 1 => (log._2.toSeq(0).entity match {
-          case VERTEX(_) => throw new Exception("should not happen")
+      .map(log => log._2.size match { // The corresponding actions should either be (CREATE) or (CREATE+DELETE)
+        case 1 => (log._2.toSeq(0).entity match { // The action is (CREATE) - the edge is never deleted
+          case VERTEX(_) => throw new EntityFilterException
           case EDGE(_, srcId, dstId) => if (vertexId == srcId) dstId else srcId
         }, Interval(log._2.toSeq(0).timestamp, Instant.MAX))
-        case 2 => (log._2.toSeq(0).entity match {
-          case VERTEX(_) => throw new Exception("should not happen")
+        case 2 => (log._2.toSeq(0).entity match { // The actions are (CREATE+DELETE) - the edge is deleted
+          case VERTEX(_) => throw new EntityFilterException
           case EDGE(_, srcId, dstId) => if (vertexId == srcId) dstId else srcId
         }, Interval(log._2.toSeq(0).timestamp, log._2.toSeq(1).timestamp))
-        case _ => throw new IllegalStateException("should not happen")
+        case _ => throw new IllegalStateException(s"Only CREATE or CREATE+DELETE allowed here. Got ${_} actions")
       })
       .filter(thing => interval.overlaps(thing._2))
       .map(_._1)
@@ -202,7 +203,7 @@ object SnapshotDeltaObject {
 
   def logToEdge(log: LogTSV): Edge[SnapshotEdgePayload] = {
     log.entity match {
-      case _: VERTEX => throw new IllegalStateException("This does not make sense. Only edges allowed")
+      case _: VERTEX => throw new EntityFilterException
       case EDGE(id, srcId, dstId) => Edge(srcId, dstId, SnapshotEdgePayload(id, log.attributes))
     }
   }
