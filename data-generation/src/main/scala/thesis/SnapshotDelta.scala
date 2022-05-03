@@ -88,7 +88,7 @@ class SnapshotDelta(val graphs: MutableList[Snapshot],
         }, Interval(log._2.toSeq(0).timestamp, log._2.toSeq(1).timestamp))
         case _ => throw new IllegalStateException(s"Only CREATE or CREATE+DELETE allowed here. Got ${_} actions")
       })
-      .filter(thing => interval.overlaps(thing._2))
+      .filter(idWithInterval => interval.overlaps(idWithInterval._2))
       .map(_._1)
   }
 }
@@ -326,6 +326,4 @@ object SnapshotDeltaObject {
     } else {
       snapshot2
     }
-
-
 }
