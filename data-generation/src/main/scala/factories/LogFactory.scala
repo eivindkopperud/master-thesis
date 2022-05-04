@@ -126,4 +126,12 @@ case class LogFactory(
       ("size", new Random().nextInt(10000).toString)
     )
   }
+
+  def getRandomEntities: Seq[Entity] = {
+    val r = new Random()
+    val num = 10
+    val vs = Seq.range(0, r.nextInt(num)).map(VERTEX(_))
+    val es = Seq.range(0, r.nextInt(num)).map(EDGE(_, r.nextInt(num), r.nextInt(num)))
+    vs ++ es
+  }
 }
