@@ -1,13 +1,11 @@
 import factories.LandyGraphFactory.createGraph
-import thesis.{Interval, Landy}
-import org.scalatest.flatspec.AnyFlatSpec
 import factories.LogFactory
 import org.apache.spark.SparkContext
-import thesis.{EDGE, VERTEX}
+import org.scalatest.flatspec.AnyFlatSpec
+import thesis.{EDGE, Interval, Landy, Snapshot, VERTEX}
 import utils.TimeUtils
 import utils.TimeUtils.{t1, t2, t3, t4}
 import wrappers.SparkTestWrapper
-import thesis.{EDGE, VERTEX}
 
 import java.time.Instant
 
@@ -24,7 +22,7 @@ class LandySpec extends AnyFlatSpec with SparkTestWrapper {
   it can "give a snapshot" in {
     val landy: Landy = new Landy(createGraph())
 
-    val graph = landy.snapshotAtTime(t2)
+    val Snapshot(graph, _) = landy.snapshotAtTime(t2)
 
     assert(graph.vertices.count() == 2)
     assert(graph.edges.count() == 1)
@@ -74,7 +72,7 @@ class LandySpec extends AnyFlatSpec with SparkTestWrapper {
     assert(g.directNeighbours(2L, Interval(t3, t3)).collect().toSeq == Seq(1L))
     assert(g.directNeighbours(2L, Interval(t4, t4)).collect().toSeq == Seq())
   }
-  
+
   it can "query for vertex edges" in {
     val graph = new Landy(createGraph())
 

@@ -1,7 +1,7 @@
 package thesis
 
 import org.apache.spark.SparkContext
-import org.apache.spark.graphx.{Edge, EdgeRDD, EdgeTriplet, Graph, VertexId, VertexRDD}
+import org.apache.spark.graphx.{Edge, EdgeRDD, Graph, VertexId, VertexRDD}
 import org.apache.spark.rdd.RDD
 import thesis.Action.{CREATE, UPDATE}
 import thesis.DataTypes.{Attributes, EdgeId, LandyAttributeGraph}
@@ -12,12 +12,11 @@ import scala.collection.mutable
 import scala.math.Ordered.orderingToOrdered
 
 
-class Landy(graph: LandyAttributeGraph) extends TemporalGraph[LandyEntityPayload, LandyEntityPayload] {
-  override val vertices: VertexRDD[LandyEntityPayload] = graph.vertices
-  override val edges: EdgeRDD[LandyEntityPayload] = graph.edges
-  override val triplets: RDD[EdgeTriplet[LandyEntityPayload, LandyEntityPayload]] = graph.triplets
+class Landy(underlyingGraph: LandyAttributeGraph) extends TemporalGraph {
+  val vertices: VertexRDD[LandyEntityPayload] = underlyingGraph.vertices
+  val edges: EdgeRDD[LandyEntityPayload] = underlyingGraph.edges
 
-  override def snapshotAtTime(instant: Instant): Graph[LandyEntityPayload, LandyEntityPayload] = {
+  def snapshotAtTimeLandy(instant: Instant): Graph[LandyEntityPayload, LandyEntityPayload] = {
     val vertices = localVertices
       .filter(vertex =>
         vertex._2.validFrom < instant &&
@@ -25,15 +24,31 @@ class Landy(graph: LandyAttributeGraph) extends TemporalGraph[LandyEntityPayload
       )
       .map(vertex => (vertex._2.id, vertex._2))
 
-    val edges = this.edges.filter(edge =>
+    val edges = this.underlyingGraph.edges.filter(edge =>
       edge.attr.validFrom < instant &&
         edge.attr.validTo >= instant
     )
     Graph(vertices, edges)
   }
 
+  override def snapshotAtTime(instant: Instant): Snapshot = {
+    val vertices = localVertices
+      .filter(vertex =>
+        vertex._2.interval.nonInclusiveContains(instant)
+      )
+      .map(vertex => (vertex._2.id, vertex._2))
+      .mapValues(_.attributes)
+
+    val edges = this.underlyingGraph.edges.filter(edge =>
+      edge.attr.interval.nonInclusiveContains(instant)
+    ).map(e => {
+      Edge(e.srcId, e.dstId, SnapshotEdgePayload(e.attr.id, e.attr.attributes))
+    })
+    Snapshot(Graph(vertices, edges), instant)
+  }
+
   override def directNeighbours(vertexId: VertexId, interval: Interval): RDD[VertexId] = {
-    this.edges.filter(edge => {
+    this.underlyingGraph.edges.filter(edge => {
       val edgeInterval = Interval(edge.attr.validFrom, edge.attr.validTo)
       (edge.srcId == vertexId || edge.dstId == vertexId) && interval.overlaps(edgeInterval)
     }
@@ -52,7 +67,7 @@ class Landy(graph: LandyAttributeGraph) extends TemporalGraph[LandyEntityPayload
   }
 
   override def activatedEdges(interval: Interval): RDD[EdgeId] = {
-    this.edges
+    this.underlyingGraph.edges
       .map(edge => (edge.attr.id, edge.attr))
       .groupByKey()
       .map(edge => (edge._1, getEarliest(edge._2.toSeq)))
@@ -76,7 +91,7 @@ class Landy(graph: LandyAttributeGraph) extends TemporalGraph[LandyEntityPayload
    * @return The local vertices of the graph
    */
   private def localVertices: VertexRDD[LandyEntityPayload] = {
-    this.vertices.filter(vertex => vertex._2 != null)
+    this.underlyingGraph.vertices.filter(vertex => vertex._2 != null)
   }
 
   override def getEntity[T <: Entity](entity: T, timestamp: Instant): Option[(T, Attributes)] = {
@@ -97,7 +112,7 @@ class Landy(graph: LandyAttributeGraph) extends TemporalGraph[LandyEntityPayload
   }
 
   def getEdge[T <: Entity](edge: T, instant: Instant): Option[(T, Attributes)] = {
-    this.edges
+    this.underlyingGraph.edges
       .filter(e => e.attr.id == edge.id)
       .filter(e => e.attr.interval.contains(instant))
       .map(e => (edge, e.attr.attributes))
