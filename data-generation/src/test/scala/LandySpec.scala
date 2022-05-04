@@ -1,11 +1,12 @@
 import factories.LandyGraphFactory.createGraph
+import thesis.{Interval, Landy}
+import org.scalatest.flatspec.AnyFlatSpec
+import wrappers.SparkTestWrapper
 import factories.LogFactory
 import org.apache.spark.SparkContext
-import org.scalatest.flatspec.AnyFlatSpec
-import thesis.{EDGE, Interval, Landy, VERTEX}
+import thesis.{EDGE, VERTEX}
 import utils.TimeUtils
-import utils.TimeUtils.t2
-import wrappers.SparkTestWrapper
+import utils.TimeUtils.{t2, t3, t4}
 
 import java.time.Instant
 
@@ -58,5 +59,18 @@ class LandySpec extends AnyFlatSpec with SparkTestWrapper {
     assert(intervalWithV2andEdge._1.count() == 1, intervalWithV2andEdge._2.count() == 1)
 
     assert(intervalWithAll._1.count() == 2 && intervalWithV1andEdge._2.count() == 1)
+  }
+
+  it can "query direct neighbours" in {
+    implicit val sparkContext: SparkContext = spark.sparkContext
+    val g = new Landy(createGraph())
+
+    // Assertions for 1L's neighbours through time
+    assert(g.directNeighbours(1L, Interval(t3, t3)).collect().toSeq == Seq(2L))
+    assert(g.directNeighbours(1L, Interval(t4, t4)).collect().toSeq == Seq())
+
+    // Assertions for 2L's neighbours through time
+    assert(g.directNeighbours(2L, Interval(t3, t3)).collect().toSeq == Seq(1L))
+    assert(g.directNeighbours(2L, Interval(t4, t4)).collect().toSeq == Seq())
   }
 }

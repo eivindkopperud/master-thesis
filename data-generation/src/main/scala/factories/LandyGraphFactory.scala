@@ -5,7 +5,7 @@ import org.apache.spark.sql.SparkSession
 import thesis.DataTypes.LandyAttributeGraph
 import thesis.SparkConfiguration.getSparkSession
 import thesis.LandyEntityPayload
-import utils.TimeUtils.{t1, t2, t3}
+import utils.TimeUtils.{t1, t2, t3, t4}
 
 import java.time.Instant
 import scala.collection.immutable.HashMap
@@ -46,7 +46,7 @@ object LandyGraphFactory {
         LandyEntityPayload(
           id = 2L,
           validFrom = t1,
-          validTo = t3,
+          validTo = t4,
           attributes = HashMap(
             "color" -> "red",
           )
