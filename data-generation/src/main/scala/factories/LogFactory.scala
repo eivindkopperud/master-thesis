@@ -129,9 +129,9 @@ case class LogFactory(
 
   def getRandomEntities: Seq[Entity] = {
     val r = new Random()
-    val num = 10
-    val vs = Seq.range(0, r.nextInt(num)).map(VERTEX(_))
-    val es = Seq.range(0, r.nextInt(num)).map(EDGE(_, r.nextInt(num), r.nextInt(num)))
-    vs ++ es
+    val maxId = 10
+    val vertices = Seq.range(0, r.nextInt(maxId )).map(VERTEX(_))
+    val edges = Seq.range(0, r.nextInt(maxId )).map(EDGE(_, r.nextInt(maxId ), r.nextInt(maxId )))
+    vertices ++ edges
   }
 }

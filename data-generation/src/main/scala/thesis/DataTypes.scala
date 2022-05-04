@@ -26,6 +26,10 @@ case class Interval(start: Instant, stop: Instant) {
   def contains(instant: Instant): Boolean = {
     this.start <= instant && instant <= this.stop
   }
+
+  def nonInclusiveContains(instant: Instant): Boolean = {
+    this.start <= instant && instant < this.stop
+  }
 }
 
 case class SnapshotEdgePayload(id: EdgeId, attributes: Attributes)
