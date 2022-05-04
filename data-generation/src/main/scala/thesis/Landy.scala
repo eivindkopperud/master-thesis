@@ -81,13 +81,12 @@ class Landy(graph: LandyAttributeGraph) extends TemporalGraph[LandyEntityPayload
 
   override def getEntity[T <: Entity](entity: T, timestamp: Instant): Option[(T, Attributes)] = {
     entity match {
-      case _: VERTEX => getVertex(entity, timestamp)
-      case _: EDGE => getEdge(entity, timestamp)
-      case _ => None
+      case v: VERTEX => getVertex(v, timestamp)
+      case e: EDGE => getEdge(e, timestamp)
     }
   }
 
-  def getVertex[T <: Entity](vertex: T, instant: Instant): Option[(T, Attributes)] = {
+  def getVertex[T <: VERTEX](vertex: T, instant: Instant): Option[(T, Attributes)] = {
     localVertices
       .filter(v => v._2.id == vertex.id)
       .filter(v => v._2.interval.contains(instant))
@@ -96,7 +95,7 @@ class Landy(graph: LandyAttributeGraph) extends TemporalGraph[LandyEntityPayload
       .headOption
   }
 
-  def getEdge[T <: Entity](edge: T, instant: Instant): Option[(T, Attributes)] = {
+  def getEdge[T <: EDGE](edge: T, instant: Instant): Option[(T, Attributes)] = {
     this.edges
       .filter(e => e.attr.id == edge.id)
       .filter(e => e.attr.interval.contains(instant))
