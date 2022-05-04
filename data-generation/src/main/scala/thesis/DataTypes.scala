@@ -41,7 +41,11 @@ object SnapshotIntervalType {
 
 final case class Snapshot(graph: AttributeGraph, instant: Instant)
 
-case class LandyEntityPayload(id: Long, validFrom: Instant, validTo: Instant, attributes: Attributes)
+case class LandyEntityPayload(id: Long, validFrom: Instant, validTo: Instant, attributes: Attributes) {
+  def interval: Interval = {
+    Interval(validFrom, validTo)
+  }
+}
 
 sealed abstract class DataSource
 

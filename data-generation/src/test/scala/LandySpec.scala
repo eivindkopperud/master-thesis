@@ -1,12 +1,13 @@
 import factories.LandyGraphFactory.createGraph
 import thesis.{Interval, Landy}
 import org.scalatest.flatspec.AnyFlatSpec
-import wrappers.SparkTestWrapper
 import factories.LogFactory
 import org.apache.spark.SparkContext
 import thesis.{EDGE, VERTEX}
 import utils.TimeUtils
-import utils.TimeUtils.{t2, t3, t4}
+import utils.TimeUtils.{t1, t2, t3, t4}
+import wrappers.SparkTestWrapper
+import thesis.{EDGE, VERTEX}
 
 import java.time.Instant
 
@@ -72,5 +73,19 @@ class LandySpec extends AnyFlatSpec with SparkTestWrapper {
     // Assertions for 2L's neighbours through time
     assert(g.directNeighbours(2L, Interval(t3, t3)).collect().toSeq == Seq(1L))
     assert(g.directNeighbours(2L, Interval(t4, t4)).collect().toSeq == Seq())
+  }
+  
+  it can "query for vertex edges" in {
+    val graph = new Landy(createGraph())
+
+    assert(graph.getEntity(VERTEX(1L), t1).get._2("color") == "red")
+    // assert(graph.getEntity(VERTEX(1L), t2).get._2("color") == "orange") currently fails due to overlapping values in t2
+    assert(graph.getEntity(VERTEX(1L), t3).get._2("color") == "orange")
+    assert(graph.getEntity(VERTEX(1L), t4).isEmpty)
+
+    assert(graph.getEdge(EDGE(1003L, 1L, 2L), t1).get._2("relation") == "brother")
+    // assert(graph.getEdge(EDGE(1003L, 1L, 2L), t2).get._2("relation") == "sister") currently fails due to overlapping values in t2
+    assert(graph.getEdge(EDGE(1003L, 1L, 2L), t3).get._2("relation") == "sister")
+    assert(graph.getEdge(EDGE(1003, 1L, 2L), t4).isEmpty)
   }
 }

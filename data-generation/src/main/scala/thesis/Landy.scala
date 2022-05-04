@@ -79,19 +79,38 @@ class Landy(graph: LandyAttributeGraph) extends TemporalGraph[LandyEntityPayload
     this.vertices.filter(vertex => vertex._2 != null)
   }
 
-  /** Return entity based on ID at a timestamp
-   *
-   * @param entity    Edge or Vertex
-   * @param timestamp Insant
-   * @return Entity Object and HashMap
-   */
-  override def getEntity[T <: Entity](entity: T, timestamp: Instant): Option[(T, Attributes)] = ???
+  override def getEntity[T <: Entity](entity: T, timestamp: Instant): Option[(T, Attributes)] = {
+    entity match {
+      case _: VERTEX => getVertex(entity, timestamp)
+      case _: EDGE => getEdge(entity, timestamp)
+      case _ => None
+    }
+  }
+
+  def getVertex[T <: Entity](vertex: T, instant: Instant): Option[(T, Attributes)] = {
+    localVertices
+      .filter(v => v._2.id == vertex.id)
+      .filter(v => v._2.interval.contains(instant))
+      .map(v => (vertex, v._2.attributes))
+      .collect()
+      .headOption
+  }
+
+  def getEdge[T <: Entity](edge: T, instant: Instant): Option[(T, Attributes)] = {
+    this.edges
+      .filter(e => e.attr.id == edge.id)
+      .filter(e => e.attr.interval.contains(instant))
+      .map(e => (edge, e.attr.attributes))
+      .collect()
+      .headOption
+  }
+
 }
 
 object Landy {
   def createEdge(log: LogTSV, validTo: Instant): Edge[LandyEntityPayload] = {
     log.entity match {
-      case VERTEX(_) => throw new EntityFilterException
+      case _: VERTEX => throw new EntityFilterException
       case EDGE(id, srcId, dstId) => {
         val payload = LandyEntityPayload(id = id, validFrom = log.timestamp, validTo = validTo, attributes = log.attributes)
         Edge(srcId, dstId, payload)
@@ -105,7 +124,7 @@ object Landy {
         val payload = LandyEntityPayload(id = id, validFrom = log.timestamp, validTo = validTo, attributes = log.attributes)
         (UtilsUtils.uuid, payload)
       }
-      case EDGE(_, _, _) => throw new EntityFilterException
+      case _: EDGE => throw new EntityFilterException
     }
   }
 

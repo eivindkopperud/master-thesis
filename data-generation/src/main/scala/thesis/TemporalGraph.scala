@@ -27,7 +27,7 @@ abstract class TemporalGraph[VD: ClassTag, ED: ClassTag] extends Serializable {
   /** Return entity based on ID at a timestamp
    *
    * @param entity    Edge or Vertex
-   * @param timestamp Insant
+   * @param timestamp Instant
    * @return Entity Object and HashMap
    */
   def getEntity[T <: Entity](entity: T, timestamp: Instant): Option[(T, Attributes)]
