@@ -12,7 +12,6 @@ import utils.{EntityFilterException, LogUtils}
 import java.time.{Duration, Instant}
 import scala.collection.mutable
 import scala.math.Ordering.Implicits.infixOrderingOps
-import scala.util.Try
 
 class SnapshotDelta(val graphs: mutable.MutableList[Snapshot],
                     val logs: RDD[LogTSV],
@@ -200,7 +199,7 @@ object SnapshotDelta {
    */
   def createSnapshotModel(logsWithSortableKey: RDD[(Long, LogTSV)], snapshotIntervalType: SnapshotIntervalType): SnapshotDelta = {
     getLogger.warn(s"Creating SnapshotModel with type:$snapshotIntervalType")
-    val max = logsWithSortableKey.map(_._1).max() // This will value is only used for Count, but it should be lazy, so its fine
+    val max = logsWithSortableKey.map(_._1).max() // This will value is only used for Time, but it should be lazy, so its fine
     val min = logsWithSortableKey.map(_._1).min() // This will be 0 for Count and the earliest timestamp for Time
 
     val (numberOfSnapShots, interval) = snapshotIntervalType match {
@@ -209,7 +208,10 @@ object SnapshotDelta {
     }
 
     val initLogs = logsWithSortableKey.filterByRange(min, interval - 1).map(_._2)
-    val initTimestamp = initLogs.map(_.timestamp).max()
+    val initTimestamp = snapshotIntervalType match {
+      case SnapshotIntervalType.Time(duration) => Instant.ofEpochSecond(duration - 1)
+      case SnapshotIntervalType.Count(numberOfActions) => initLogs.map(_.timestamp).max()
+    }
     val initialGraph = createGraph(initLogs)
     val graphs = mutable.MutableList(Snapshot(initialGraph, initTimestamp))
 
@@ -224,9 +226,10 @@ object SnapshotDelta {
       val newVertices = applyVertexLogsToSnapshot(previousSnapshot.graph, logInterval)
       val newEdges = applyEdgeLogsToSnapshot(previousSnapshot.graph, logInterval)
 
-      val graphTimestamp = Try {
-        logInterval.map(_.timestamp).max()
-      }.getOrElse(Instant.ofEpochSecond(min + (interval * i + 1) - 1)) //TODO write test to make sure the timestamps are correct
+      val graphTimestamp = snapshotIntervalType match {
+        case SnapshotIntervalType.Time(duration) => Instant.ofEpochSecond(min + (interval * (i + 1) - 1))
+        case SnapshotIntervalType.Count(numberOfActions) => logInterval.map(_.timestamp).max()
+      }
       val newGraphWithTimestamp = Snapshot(Graph(newVertices, newEdges), graphTimestamp)
       graphs += newGraphWithTimestamp
     }
