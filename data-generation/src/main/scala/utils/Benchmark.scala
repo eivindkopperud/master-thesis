@@ -7,21 +7,23 @@ import scala.concurrent.duration.NANOSECONDS
 /** Benchmark
  * Can be used like this:
  * {{{
- *   val b = Benchmark(ConsoleWriter, textPrefix="doStuff")
+ *   val b = Benchmark(ConsoleWriter, textPrefix="doStuff", customColumn="number of something")
  *   b.writeHeader
- *   b.benchmarkSingle({spark.doStuff})
+ *   b.benchmarkSingle({spark.doStuff}, customColum={someCalculation})
  *   b.textPrefix = "SomeOtherFunction"
- *   b.benchmarkAvg({spark.someOtherFunction}, 10)
- *   b.benchmarkAvg({spark.lastFunction},5, "lastFunction")
+ *   b.benchmarkAvg({spark.someOtherFunction}, 10, customColum={someCalculation}))
+ *   b.benchmarkAvg({spark.lastFunction},5, "lastFunction", customColum={someCalculation}))
  *   b.close() // should be called if its a FileWriter
  * }}}
  * textPrefix is a mutable variable that sets the name for the output format
  *
- * @param writer    IoC, write to file or to console
- * @param inSeconds if seconds is the preferred output unit of time (Could actually just be removed)
+ * @param writer       IoC, write to file or to console
+ * @param inSeconds    if seconds is the preferred output unit of time
+ * @param textPrefix   The function that is run
+ * @param customColumn A column where the benchmark user decides the content
  */
-case class Benchmark(writer: Writer, inSeconds: Boolean = false, textPrefix: String) {
-  val header = "function,value,timeunit,number of runs"
+case class Benchmark(writer: Writer, inSeconds: Boolean = false, textPrefix: String, customColumn: String = "") {
+  val header = s"function,value,timeunit,number of runs,$customColumn"
 
 
   def writeHeader(): Unit = {
@@ -30,20 +32,20 @@ case class Benchmark(writer: Writer, inSeconds: Boolean = false, textPrefix: Str
 
   def close(): Unit = writer.close()
 
-  def benchmarkSingle[T](function: => T, textPrefix: String = textPrefix): T = {
+  def benchmarkSingle[T](function: => T, textPrefix: String = textPrefix, customColumnValue: String = ""): T = {
     val start = System.nanoTime()
     val returnValue = function
     val end = System.nanoTime()
     val printString = if (inSeconds) {
-      s"$textPrefix,${NANOSECONDS.toSeconds(end - start)},s,1"
+      s"$textPrefix,${NANOSECONDS.toSeconds(end - start)},s,1,$customColumnValue"
     } else {
-      s"$textPrefix,${NANOSECONDS.toMillis(end - start)},ms,1"
+      s"$textPrefix,${NANOSECONDS.toMillis(end - start)},ms,1,$customColumnValue"
     }
     writer.write(printString)
     returnValue
   }
 
-  def benchmarkAvg[T](function: => T, numberOfRuns: Int = 1, textPrefix: String = textPrefix): Unit = {
+  def benchmarkAvg[T](function: => T, numberOfRuns: Int = 1, textPrefix: String = textPrefix, customColumnValue: String = ""): Unit = {
     val timings = mutable.MutableList[Long]()
     (1 to numberOfRuns) foreach (_ => {
       val start = System.nanoTime()
@@ -53,9 +55,9 @@ case class Benchmark(writer: Writer, inSeconds: Boolean = false, textPrefix: Str
     })
     val avg = timings.sum / timings.length.toFloat
     val printString = if (inSeconds) {
-      s"${textPrefix},${NANOSECONDS.toSeconds(avg.round)},s,$numberOfRuns"
+      s"$textPrefix,${NANOSECONDS.toSeconds(avg.round)},s,$numberOfRuns,$customColumnValue"
     } else {
-      s"$textPrefix,${NANOSECONDS.toMillis(avg.round)},ms,$numberOfRuns"
+      s"$textPrefix,${NANOSECONDS.toMillis(avg.round)},ms,$numberOfRuns,$customColumnValue"
     }
     writer.write(printString)
   }
