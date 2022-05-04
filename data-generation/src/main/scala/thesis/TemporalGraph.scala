@@ -1,18 +1,17 @@
 package thesis
 
-import org.apache.spark.graphx.{EdgeRDD, EdgeTriplet, Graph, VertexId, VertexRDD}
+import org.apache.spark.graphx.VertexId
 import org.apache.spark.rdd.RDD
 import thesis.DataTypes.{Attributes, EdgeId}
 
 import java.time.Instant
-import scala.reflect.ClassTag
 
-abstract class TemporalGraph[VD: ClassTag, ED: ClassTag] extends Serializable {
-  val vertices: VertexRDD[VD]
-  val edges: EdgeRDD[ED]
-  val triplets: RDD[EdgeTriplet[VD, ED]]
+abstract class TemporalGraph extends Serializable {
+  //  val vertices: VertexRDD[Attributes]
+  //  val edges: EdgeRDD[SnapshotEdgePayload]
+  //  val triplets: RDD[EdgeTriplet[Attributes, SnapshotEdgePayload]]
 
-  def snapshotAtTime(instant: Instant): Graph[VD, ED]
+  def snapshotAtTime(instant: Instant): Snapshot
 
 
   /**

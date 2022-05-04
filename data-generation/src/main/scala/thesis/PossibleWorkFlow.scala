@@ -52,10 +52,10 @@ object PossibleWorkFlow {
     val landyModel = Landy(logs)
     //TODO benchmark queries
     val graphAtTime = snapshotModel.snapshotAtTime(2012)
-    println(s"Graph at time 2012 has ${graphAtTime.vertices.count()} vertices and ${graphAtTime.edges.count()} edges")
+    println(s"Graph at time 2012 has ${graphAtTime.graph.vertices.count()} vertices and ${graphAtTime.graph.edges.count()} edges")
 
     val graphAtTimeLandy = landyModel.snapshotAtTime(2013)
-    println(s"Graph at time 2012 has ${graphAtTimeLandy.vertices.count()} vertices and ${graphAtTimeLandy.edges.count()} edges")
+    println(s"Graph at time 2012 has ${graphAtTimeLandy.graph.vertices.count()} vertices and ${graphAtTimeLandy.graph.edges.count()} edges")
 
     // Timing of whole process
     val end = System.nanoTime()
