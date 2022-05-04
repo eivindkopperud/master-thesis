@@ -15,10 +15,7 @@ import scala.math.Ordering.Implicits.infixOrderingOps
 
 class SnapshotDelta(val graphs: mutable.MutableList[Snapshot],
                     val logs: RDD[LogTSV],
-                    val snapshotType: SnapshotIntervalType) extends TemporalGraph[Attributes, SnapshotEdgePayload] {
-  override val vertices: VertexRDD[Attributes] = graphs.get(0).get.graph.vertices
-  override val edges: EdgeRDD[SnapshotEdgePayload] = graphs.get(0).get.graph.edges
-  override val triplets: RDD[EdgeTriplet[Attributes, SnapshotEdgePayload]] = graphs.get(0).get.graph.triplets
+                    val snapshotType: SnapshotIntervalType) extends TemporalGraph {
   val logger: Logger = getLogger
 
   def forwardApplyLogs(graph: AttributeGraph, logsToApply: RDD[LogTSV]): AttributeGraph = {
@@ -65,23 +62,23 @@ class SnapshotDelta(val graphs: mutable.MutableList[Snapshot],
     edgeSquash.filter(_._2.action == CREATE).map(_._1)
   }
 
-  override def snapshotAtTime(instant: Instant): AttributeGraph = {
+  override def snapshotAtTime(instant: Instant): Snapshot = {
 
     val mostRecentMaterializedSnapshot = getMostRecentMaterializedSnapshot(graphs, instant)
     mostRecentMaterializedSnapshot match {
       case Some(snapshot) =>
         if (snapshot.instant == instant) {
           logger.warn("The queried graph is already materialized")
-          snapshot.graph
+          Snapshot(snapshot.graph, instant)
         } else {
           logger.warn("Closest graph is in the past. Need to apply logs forwards")
           val logsToApply = getLogsInInterval(logs, Interval(snapshot.instant, instant))
-          forwardApplyLogs(snapshot.graph, logsToApply)
+          Snapshot(forwardApplyLogs(snapshot.graph, logsToApply), instant)
         }
       case None =>
         logger.warn("Closest graph in the future, and there is no one in the past.")
         val initialLogs = getLogsInInterval(logs, Interval(Instant.MIN, instant))
-        createGraph(initialLogs)
+        Snapshot(createGraph(initialLogs), instant)
     }
   }
 

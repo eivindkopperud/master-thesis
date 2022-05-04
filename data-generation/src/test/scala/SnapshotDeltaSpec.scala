@@ -25,6 +25,18 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     assert(graphs.graphs.length == 2)
   }
 
+  // HELP ME, if I extract this function outside of the test the assert function is the wrong one
+  // Maybe I was just bad with import
+  // This is assert is not Scalas built in but from scalatest
+  def assertGraphSimilarity[VD, ED](g1: Graph[VD, ED], g2: Graph[VD, ED]): Unit = {
+    g1.vertices.collect().zip(g2.vertices.collect).foreach {
+      case (v1, v2) => assert(v1 == v2)
+    }
+    g1.edges.collect().zip(g2.edges.collect()).foreach {
+      case (e1, e2) => assert(e1 == e2)
+    }
+  }
+
   it should "also have the correct amount when it is time based" in {
     val updates = List(1, 1, 0, 0, 1, 1) // List of amount of updates for t_1, t_2 .. t_6
     val logs = LogFactory().buildIrregularVertexSequence(updates)
@@ -44,14 +56,6 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     assert(graphs.graphs.length == 1)
   }
 
-  def assertGraphSimilarity[VD, ED](g1: Graph[VD, ED], g2: Graph[VD, ED]): Unit = {
-    g1.vertices.collect().zip(g2.vertices.collect).foreach {
-      case (v1, v2) => assert(v1 == v2)
-    }
-    g1.edges.collect().zip(g2.edges.collect()).foreach {
-      case (e1, e2) => assert(e1 == e2)
-    }
-  }
 
   it should "have the right amount of vertices" in {
     val logsVertex1 = LogFactory().buildSingleSequence(VERTEX(1), updateAmount = 5)
@@ -134,7 +138,7 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     val logRDD = spark.sparkContext.parallelize(logs)
     val snapshotModel = SnapshotDelta(logRDD, Time(3))
     val snapshot = snapshotModel.snapshotAtTime(3)
-    assertGraphSimilarity(snapshot, createGraph(logs.take(4))) // Take(4) == Instant.ofEpoch(3)
+    assertGraphSimilarity(snapshot.graph, createGraph(logs.take(4))) // Take(4) == Instant.ofEpoch(3)
   }
 
   // backwardsApply is not implemented
@@ -145,7 +149,7 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     val logs = LogFactory().buildIrregularVertexSequence(updates)
     val snapshotModel = SnapshotDelta(logs, Time(3))
     val snapshot = snapshotModel.snapshotAtTime(1)
-    assertGraphSimilarity(snapshot, createGraph(logs.take(2))) // Take(2) == Instant.ofEpoch(1)
+    assertGraphSimilarity(snapshot.graph, createGraph(logs.take(2))) // Take(2) == Instant.ofEpoch(1)
   }
 
   // This test currently tests an unused function
