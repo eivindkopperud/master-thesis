@@ -77,13 +77,30 @@ case class ConsoleWriter() extends Writer {
 }
 
 case class FileWriter(filename: String) extends Writer {
-  val pw = new java.io.PrintWriter(Instant.now().toString + "-" + filename + ".csv") // Unique name everytime, will never append to previous run
+  val pw = new java.io.PrintWriter(getFilePath(filename))
 
   override def write(str: String): Unit = {
     pw.append(str + "\n")
   }
 
   override def close(): Unit = pw.close()
+
+  /**
+   * Get the absolute file path to the benchmark output.
+   * Requires the user to have set the benchmark directory outside the root folder
+   * of the the project (master-thesis).
+   *
+   * @return A unique, absolute filepath
+   */
+  private def getFilePath(filename: String): String = {
+    val projectLocation = new java.io.File("../../").getCanonicalPath
+    val benchmarkDirectory = "/benchmarks/"
+    val timePrefix = Instant.now()
+      .toString
+      .split("\\.")(0) // Get the format YYYY-mm-ddTHH:MM:SS
+      .replace(":", "-")
+    s"$projectLocation$benchmarkDirectory$timePrefix-$filename.csv"
+  }
 }
 
 case class BothWriter(filename: String) extends Writer {
