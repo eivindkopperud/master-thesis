@@ -1,14 +1,14 @@
 import factories.LogFactory
 import org.apache.spark.SparkContext
 import org.apache.spark.graphx.Graph
-import org.apache.spark.rdd.RDD
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers.be
 import org.scalatest.matchers.should.Matchers.a
 import thesis.Action.{CREATE, DELETE, UPDATE}
-import thesis.SnapshotDeltaObject.{applyVertexLogsToSnapshot, createGraph, getSquashedActionsByVertexId, mergeLogTSV}
+import thesis.SnapshotDelta.{applyVertexLogsToSnapshot, createGraph, getSquashedActionsByVertexId, mergeLogTSV}
 import thesis.SnapshotIntervalType.{Count, Time}
 import thesis._
+import utils.LogUtils.seqToRdd
 import utils.TimeUtils._
 import wrappers.SparkTestWrapper
 
@@ -20,7 +20,7 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     val updateAmount = 5
     val logs = LogFactory().buildSingleSequence(VERTEX(1), updateAmount)
     val logRDD = spark.sparkContext.parallelize(logs)
-    val graphs = SnapshotDeltaObject.create(logRDD, Count(updateAmount - 1))
+    val graphs = SnapshotDelta(logRDD, Count(updateAmount - 1))
 
     assert(graphs.graphs.length == 2)
   }
@@ -29,7 +29,7 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     val updates = List(1, 1, 0, 0, 1, 1) // List of amount of updates for t_1, t_2 .. t_6
     val logs = LogFactory().buildIrregularVertexSequence(updates)
     val logRDD = spark.sparkContext.parallelize(logs)
-    val snapshotModel = SnapshotDeltaObject.create(logRDD, Time(2))
+    val snapshotModel = SnapshotDelta(logRDD, Time(2))
     assert(snapshotModel.logs.count() == 4)
     assert(snapshotModel.graphs.length == 3)
     assertGraphSimilarity(snapshotModel.graphs(0).graph, snapshotModel.graphs(1).graph)
@@ -39,7 +39,7 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     val updateAmount = 5
     val logs = LogFactory().buildSingleSequence(VERTEX(1), updateAmount)
     val logRDD = spark.sparkContext.parallelize(logs)
-    val graphs = SnapshotDeltaObject.create(logRDD, Count(2 * updateAmount))
+    val graphs = SnapshotDelta(logRDD, Count(2 * updateAmount))
 
     assert(graphs.graphs.length == 1)
   }
@@ -57,7 +57,7 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     val logsVertex1 = LogFactory().buildSingleSequence(VERTEX(1), updateAmount = 5)
     val logsVertex2 = LogFactory().buildSingleSequence(VERTEX(2), updateAmount = 3)
     val logs = spark.sparkContext.parallelize(logsVertex1 ++ logsVertex2)
-    val graphs = SnapshotDeltaObject.create(logs, Count(8))
+    val graphs = SnapshotDelta(logs, Count(8))
 
     assert(graphs.graphs.head.graph.vertices.collect().length == 2)
     assert(graphs.graphs(0).graph.vertices.collect().length == 2)
@@ -126,17 +126,13 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     }
   }
 
-  implicit def seqToRdd(s: Seq[LogTSV])(implicit sc: SparkContext): RDD[LogTSV] = {
-    sc.parallelize(s)
-  }
-
   "SnapshotAtTime" should "return correct graph given a timestamp close to a snapshot in the past" in {
     implicit val sparkContext: SparkContext = spark.sparkContext
 
     val updates = List(1, 1, 1, 1, 1, 1, 1) // List of amount of updates for t_1, t_2 .. t_6
     val logs = LogFactory().buildIrregularVertexSequence(updates)
     val logRDD = spark.sparkContext.parallelize(logs)
-    val snapshotModel = SnapshotDeltaObject.create(logRDD, Time(3))
+    val snapshotModel = SnapshotDelta(logRDD, Time(3))
     val snapshot = snapshotModel.snapshotAtTime(3)
     assertGraphSimilarity(snapshot, createGraph(logs.take(4))) // Take(4) == Instant.ofEpoch(3)
   }
@@ -147,7 +143,7 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
 
     val updates = List(1, 1, 1, 1, 1, 1, 1) // List of amount of updates for t_1, t_2 .. t_6
     val logs = LogFactory().buildIrregularVertexSequence(updates)
-    val snapshotModel = SnapshotDeltaObject.create(logs, Time(3))
+    val snapshotModel = SnapshotDelta(logs, Time(3))
     val snapshot = snapshotModel.snapshotAtTime(1)
     assertGraphSimilarity(snapshot, createGraph(logs.take(2))) // Take(2) == Instant.ofEpoch(1)
   }
@@ -161,9 +157,9 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     val earlyGraph = Snapshot(createGraph(vertexLogs1), 0: Instant)
     val lateGraph = Snapshot(createGraph(vertexLogs2), 10: Instant)
     assertGraphSimilarity(lateGraph.graph,
-      SnapshotDeltaObject.returnClosestGraph(6)(earlyGraph, lateGraph).graph)
+      SnapshotDelta.returnClosestGraph(6)(earlyGraph, lateGraph).graph)
     assertGraphSimilarity(earlyGraph.graph,
-      SnapshotDeltaObject.returnClosestGraph(1)(earlyGraph, lateGraph).graph)
+      SnapshotDelta.returnClosestGraph(1)(earlyGraph, lateGraph).graph)
   }
 
   "applyVertexLogsToSnapshot" should "apply vertex logs correctly to the given snapshot" in {
@@ -190,7 +186,7 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     val vertexLogs2 = LogFactory(startTime = 5, endTime = 10).buildSingleSequence(VERTEX(2))
     val edgeLogs = LogFactory(startTime = 4, endTime = 7).buildSingleSequence(EDGE(1, 1, 2))
     val logs = (vertexLogs1 ++ vertexLogs2 ++ edgeLogs).sortBy(_.timestamp)
-    val g = SnapshotDeltaObject.create(logs, SnapshotIntervalType.Time(3))
+    val g = SnapshotDelta(logs, SnapshotIntervalType.Time(3))
     val intervalWithVertex1 = g.activatedEntities(Interval(0, 3))
     val intervalWithVertex2 = g.activatedEntities(Interval(5, 7))
     val intervalWithEdge = g.activatedEntities(Interval(3, 4))
@@ -215,7 +211,7 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     val edgeLogs1 = LogFactory(startTime = t1, endTime = t3).buildSingleSequenceWithDelete(EDGE(100L, 1L, 2L))
     val edgeLogs2 = LogFactory(startTime = t2, endTime = t4).buildSingleSequence(EDGE(200L, 1L, 3L))
     val logs = (edgeLogs1 ++ edgeLogs2).sortBy(_.timestamp)
-    val g = SnapshotDeltaObject.create(logs, SnapshotIntervalType.Count(3))
+    val g = SnapshotDelta(logs, SnapshotIntervalType.Count(3))
 
     // Assertions for 1L's neighbours through time
     assert(g.directNeighbours(1L, Interval(t1, t1)).collect().toSeq == Seq(2L))
@@ -245,7 +241,7 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     val update = LogFactory().getOne.copy(entity = v, timestamp = 2, action = UPDATE)
     val logs = Seq(create, update)
 
-    val g = SnapshotDeltaObject.create(logs, SnapshotIntervalType.Time(3))
+    val g = SnapshotDelta(logs, SnapshotIntervalType.Time(3))
     // TODO write tests for edges
     val getV = g.getEntity(v, 1)
     val getVAfterUpdate = g.getEntity(v, 3)
@@ -264,7 +260,7 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     val v2 = LogFactory(startTime = 0L, endTime = 10L).buildSingleSequence(VERTEX(2))
     val logs = (Seq(eCreate, eUpdate) ++ v1 ++ v2).sortBy(_.timestamp)
 
-    val g = SnapshotDeltaObject.create(logs, SnapshotIntervalType.Time(3))
+    val g = SnapshotDelta(logs, SnapshotIntervalType.Time(3))
     val getEdge = g.getEntity(edge, 1)
     val getEdgeAfterUpdate = g.getEntity(edge, 3)
     assert(getEdge.get._2 == eCreate.attributes)

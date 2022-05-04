@@ -6,7 +6,7 @@ import org.apache.spark.rdd.RDD.rddToOrderedRDDFunctions
 import org.slf4j.{Logger, LoggerFactory}
 import thesis.Action.{CREATE, DELETE, UPDATE}
 import thesis.DataTypes.{AttributeGraph, Attributes, EdgeId}
-import thesis.SnapshotDeltaObject._
+import thesis.SnapshotDelta._
 import utils.{EntityFilterException, LogUtils}
 
 import java.time.{Duration, Instant}
@@ -177,10 +177,10 @@ class SnapshotDelta(val graphs: mutable.MutableList[Snapshot],
 }
 
 
-object SnapshotDeltaObject {
+object SnapshotDelta {
   def getLogger: Logger = LoggerFactory.getLogger("SnapShotDelta")
 
-  def create[VD, ED](logs: RDD[LogTSV], snapType: SnapshotIntervalType): SnapshotDelta = {
+  def apply[VD, ED](logs: RDD[LogTSV], snapType: SnapshotIntervalType): SnapshotDelta = {
     snapType match {
       // TODO the first argument logsWithSortableKey should be moved into the function
       case SnapshotIntervalType.Time(duration) => createSnapshotModel(logs.map(log => (log.timestamp.getEpochSecond, log)), snapType)

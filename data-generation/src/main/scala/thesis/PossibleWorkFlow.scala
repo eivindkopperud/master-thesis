@@ -44,7 +44,7 @@ object PossibleWorkFlow {
       logs
     }
     logger.warn("Generate temporal model")
-    val snapshotModel = SnapshotDeltaObject.create(logs, SnapshotIntervalType.Count(10000))
+    val snapshotModel = SnapshotDelta.apply(logs, SnapshotIntervalType.Count(10000))
 
     println(s"Number of vertices in the first snapshot ${snapshotModel.graphs.head.graph.vertices.count()}")
     println(s"Number of logs ${logs.count()}")

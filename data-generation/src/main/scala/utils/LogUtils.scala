@@ -1,5 +1,6 @@
 package utils
 
+import org.apache.spark.SparkContext
 import org.apache.spark.graphx.VertexId
 import org.apache.spark.rdd.RDD
 import thesis.{EDGE, Entity, LogTSV, VERTEX}
@@ -52,5 +53,9 @@ object LogUtils {
 
   def reverse(logs: Seq[LogTSV]): Seq[LogTSV] = {
     logs.sortWith((log1, log2) => log1.timestamp.isAfter(log2.timestamp))
+  }
+
+  implicit def seqToRdd(s: Seq[LogTSV])(implicit sc: SparkContext): RDD[LogTSV] = {
+    sc.parallelize(s)
   }
 }
