@@ -4,7 +4,7 @@ import org.apache.spark.graphx.Graph
 import org.scalatest.Outcome
 import org.scalatest.flatspec.FixtureAnyFlatSpec
 import thesis.SnapshotIntervalType.Time
-import thesis.{Entity, Interval, Landy, LogTSV, SnapshotDelta}
+import thesis.{EDGE, Entity, Interval, Landy, LogTSV, SnapshotDelta, VERTEX}
 import utils.LogUtils.seqToRdd
 import utils.TimeUtils.secondsToInstant
 import wrappers.SparkTestWrapper
@@ -30,7 +30,6 @@ class SnapshotLandySpec extends FixtureAnyFlatSpec with SparkTestWrapper {
       .getRandomEntities(11, 20)
     val logs2 = offsetEntities
       .flatMap(offsetFactory.buildSingleSequenceWithDelete(_))
-    logs1.foreach(println)
     val logs = (logs1 ++ logs2).sortBy(_.timestamp)
     val landyGraph = Landy(logs)
     val snapshotDeltaGraph = SnapshotDelta(logs, Time(100))
@@ -67,9 +66,8 @@ class SnapshotLandySpec extends FixtureAnyFlatSpec with SparkTestWrapper {
     })
   }
 
-  // TODO test directNeighbours
 
-  "activatedEntities" should "b equal for Landy and SnapshotDelta" in { f =>
+  "activatedEntities" should "be equal for Landy and SnapshotDelta" in { f =>
     val FixtureParam(_, _, landyGraph, snapshotDeltaGraph, _) = f
     val onlyFirstBatch = Interval(0, 100)
     val bothBatches = Interval(0, 300)
@@ -82,5 +80,24 @@ class SnapshotLandySpec extends FixtureAnyFlatSpec with SparkTestWrapper {
       landyVertices.collect().sorted.zip(deltaVertices.collect().sorted).foreach({ case (v1, v2) => assert(v1 == v2) })
       landyEdges.collect().sorted.zip(deltaEdges.collect().sorted).foreach({ case (e1, e2) => assert(e1 == e2) })
     })
+  }
+
+  "directNeighbours" should "be equal for Landy and SnapshotDelta" in { f =>
+    val FixtureParam(_, entities, landyGraph, snapshotDeltaGraph, _) = f
+    val vertices = entities.flatMap(e => e match {
+      case v: VERTEX => Some(v)
+      case _: EDGE => None
+    })
+    val bothBatches = Interval(0, 300)
+    vertices.foreach(v => {
+      val lVertexIds = landyGraph.directNeighbours(v.id, bothBatches).collect().sorted
+      val sdVertexIds = snapshotDeltaGraph.directNeighbours(v.id, bothBatches).collect().sorted
+      println(lVertexIds.mkString("Array(", ", ", ")"))
+      println(sdVertexIds.mkString("Array(", ", ", ")"))
+      lVertexIds.zip(sdVertexIds).foreach({ case (vId, uId) => assert(vId == uId) })
+    }
+    )
+
+
   }
 }
