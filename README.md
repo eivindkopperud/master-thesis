@@ -1,6 +1,7 @@
 <p align="center">
   <img width="200" src="https://github.com/eivindkopperud/master-thesis/blob/chore/readme/public/tempura.png.png" alt="Tempura logo">
-  ![Scala CI status](https://github.com/eivindkopperud/master-thesis/actions/workflows/test.yml/badge.svg)
+  <br>
+  <img src="https://github.com/eivindkopperud/master-thesis/actions/workflows/test.yml/badge.svg" alt="Scala test status")
 </p>
 
 ## What is Tempura?
