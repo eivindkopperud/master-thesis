@@ -9,23 +9,28 @@ abstract class QueryBenchmark(val iterationCount: Int, val customColumn: String,
   var benchmarks: Seq[Benchmark] = Seq()
 
   def run: Unit = {
-    benchmarkSuffixes.length match {
-      case 0 => initialize()
-      case 1 => initialize()
-      case _ => initialize(benchmarkSuffixes)
-    }
+    initialize
     for (i <- 1 to iterationCount) {
       execute(i)
     }
     tearDown()
   }
 
-  def initialize(): Unit = {
+  private def initialize: Unit = {
+    benchmarkSuffixes.length match {
+      case 0 => initializeSingle()
+      case 1 => initializeSingle()
+      case _ => initializeMultiple(benchmarkSuffixes)
+    }
+    benchmarks.foreach(_.writeHeader())
+  }
+
+  def initializeSingle(): Unit = {
     val fileWriter = FileWriter(filename = getClass.getSimpleName)
     benchmarks = benchmarks :+ Benchmark(fileWriter, textPrefix = getClass.getSimpleName, customColumn = customColumn)
   }
 
-  def initialize(benchmarkSuffixes: Seq[String]): Unit = {
+  def initializeMultiple(benchmarkSuffixes: Seq[String]): Unit = {
     benchmarkSuffixes.foreach(suffix => {
       val benchmarkId = s"${getClass.getSimpleName}-$suffix"
       val fileWriter = FileWriter(filename = benchmarkId)
