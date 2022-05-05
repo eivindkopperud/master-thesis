@@ -1,7 +1,7 @@
-# Tempura 🍣
-<img src="https://github.com/eivindkopperud/master-thesis/blob/chore/readme/public/tempura.png.png" alt="Tempura logo" width="200"/>
-
-
+<p align="center">
+  <img width="200" src="https://github.com/eivindkopperud/master-thesis/blob/chore/readme/public/tempura.png.png" alt="Tempura logo">
+  ![Scala CI status](https://github.com/eivindkopperud/master-thesis/actions/workflows/test.yml/badge.svg)
+</p>
 
 ## What is Tempura?
 ✨ an open-source GraphX extension for temporal graph processing ✨
