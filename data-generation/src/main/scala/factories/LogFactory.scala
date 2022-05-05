@@ -127,11 +127,10 @@ case class LogFactory(
     )
   }
 
-  def getRandomEntities: Seq[Entity] = {
+  def getRandomEntities(minId: Int = 0, maxId: Int = 10): Seq[Entity] = {
     val r = new Random()
-    val maxId = 10
-    val vertices = Seq.range(0, r.nextInt(maxId )).map(VERTEX(_))
-    val edges = Seq.range(0, r.nextInt(maxId )).map(EDGE(_, r.nextInt(maxId ), r.nextInt(maxId )))
+    val vertices = Seq.range(minId, r.nextInt(maxId) + minId).map(VERTEX(_))
+    val edges = Seq.range(minId, r.nextInt(maxId) + minId).map(EDGE(_, r.nextInt(maxId), r.nextInt(maxId)))
     vertices ++ edges
   }
 }
