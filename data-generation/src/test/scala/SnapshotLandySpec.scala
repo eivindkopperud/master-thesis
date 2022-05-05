@@ -4,7 +4,7 @@ import org.apache.spark.graphx.Graph
 import org.scalatest.Outcome
 import org.scalatest.flatspec.FixtureAnyFlatSpec
 import thesis.SnapshotIntervalType.Time
-import thesis.{Entity, Landy, LogTSV, SnapshotDelta}
+import thesis.{Entity, Interval, Landy, LogTSV, SnapshotDelta}
 import utils.LogUtils.seqToRdd
 import utils.TimeUtils.secondsToInstant
 import wrappers.SparkTestWrapper
@@ -19,12 +19,19 @@ class SnapshotLandySpec extends FixtureAnyFlatSpec with SparkTestWrapper {
 
   override def withFixture(test: OneArgTest): Outcome = {
     implicit val sparkContext: SparkContext = spark.sparkContext // Needed for implicit conversion of Seq -> RDD
-    val factory = LogFactory(startTime = 0L, endTime = 1000L)
+    val factory = LogFactory(startTime = 10L, endTime = 1000L)
     val entities = factory
-      .getRandomEntities
-    val logs = entities
+      .getRandomEntities(0, 10)
+    val logs1 = entities
       .flatMap(factory.buildSingleSequenceWithDelete(_))
-      .sortBy(_.timestamp)
+
+    val offsetFactory = LogFactory(startTime = 250L, endTime = 750L)
+    val offsetEntities = offsetFactory
+      .getRandomEntities(11, 20)
+    val logs2 = offsetEntities
+      .flatMap(offsetFactory.buildSingleSequenceWithDelete(_))
+    logs1.foreach(println)
+    val logs = (logs1 ++ logs2).sortBy(_.timestamp)
     val landyGraph = Landy(logs)
     val snapshotDeltaGraph = SnapshotDelta(logs, Time(100))
     withFixture(test.toNoArgTest(FixtureParam(
@@ -62,5 +69,18 @@ class SnapshotLandySpec extends FixtureAnyFlatSpec with SparkTestWrapper {
 
   // TODO test directNeighbours
 
-  // TODO test activatedEntities
+  "activatedEntities" should "b equal for Landy and SnapshotDelta" in { f =>
+    val FixtureParam(_, _, landyGraph, snapshotDeltaGraph, _) = f
+    val onlyFirstBatch = Interval(0, 100)
+    val bothBatches = Interval(0, 300)
+    val onlyLastBatch = Interval(210, 300)
+    val intervals = Seq(onlyFirstBatch, bothBatches, onlyLastBatch)
+    intervals.foreach(interval => {
+      val (landyVertices, landyEdges) = landyGraph.activatedEntities(interval)
+      val (deltaVertices, deltaEdges) = snapshotDeltaGraph.activatedEntities(interval)
+
+      landyVertices.collect().sorted.zip(deltaVertices.collect().sorted).foreach({ case (v1, v2) => assert(v1 == v2) })
+      landyEdges.collect().sorted.zip(deltaEdges.collect().sorted).foreach({ case (e1, e2) => assert(e1 == e2) })
+    })
+  }
 }
