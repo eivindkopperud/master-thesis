@@ -22,7 +22,7 @@ abstract class QueryBenchmark(val iterationCount: Int, val customColumn: String,
 
   def initialize(): Unit = {
     val fileWriter = FileWriter(filename = getClass.getSimpleName)
-    benchmarks :+ Benchmark(fileWriter, textPrefix = getClass.getSimpleName, customColumn = customColumn)
+    benchmarks = benchmarks :+ Benchmark(fileWriter, textPrefix = getClass.getSimpleName, customColumn = customColumn)
   }
 
   def initialize(benchmarkSuffixes: Seq[String]): Unit = {
