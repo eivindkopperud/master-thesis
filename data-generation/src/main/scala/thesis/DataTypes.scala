@@ -58,6 +58,7 @@ object DataSource {
 
   final case object FbMessages extends DataSource
 
+  final case object ContactsHyperText extends DataSource
 }
 
 sealed abstract class CorrelationMode
@@ -78,6 +79,8 @@ object DistributionType {
   final case class GaussianType(mu: Int, sigma: Double) extends DistributionType
 
   final case class UniformType(low: Double, high: Double) extends DistributionType
+
+  final case class ZipfType(maxValue: Int, exponent: Double) extends DistributionType
 }
 
 final case class IntervalAndUpdateCount(interval: Interval, count: Int)
