@@ -16,6 +16,7 @@ abstract class QueryBenchmark(val iterationCount: Int, val customColumn: String,
   def run: Unit = {
     logger.warn("RUN STARTING")
     initialize
+    warmUp()
     for (i <- 1 to iterationCount) {
       logger.warn(s"Iteration $i")
       execute(i)
@@ -46,6 +47,8 @@ abstract class QueryBenchmark(val iterationCount: Int, val customColumn: String,
       benchmarks = benchmarks :+ Benchmark(fileWriter, textPrefix = benchmarkId, customColumn = customColumn)
     })
   }
+
+  def warmUp(): Unit = {}
 
   def execute(iteration: Int): Unit
 
