@@ -19,6 +19,7 @@ object TopologyGraphGenerator {
   def getPathAndDelim(dataSource: DataSource): (String, String) = dataSource match {
     case DataSource.Reptilian => ("src/main/resources/reptilia-tortoise-network-sl.csv", " ")
     case DataSource.FbMessages => ("src/main/resources/fb-messages-fix.csv", ",")
+    case DataSource.ContactsHyperText => ("src/main/resources/ia-contacts_hypertext2009.csv", ",")
   }
 
   def generateGraph(
