@@ -1,7 +1,7 @@
 package thesis
 
 import org.apache.spark.SparkContext
-import org.apache.spark.graphx.{Edge, EdgeRDD, Graph, VertexId, VertexRDD}
+import org.apache.spark.graphx.{Edge, Graph, VertexId, VertexRDD}
 import org.apache.spark.rdd.RDD
 import thesis.Action.{CREATE, UPDATE}
 import thesis.DataTypes.{Attributes, EdgeId, LandyAttributeGraph}
@@ -12,9 +12,8 @@ import scala.collection.mutable
 import scala.math.Ordered.orderingToOrdered
 
 
-class Landy(underlyingGraph: LandyAttributeGraph) extends TemporalGraph {
-  val vertices: VertexRDD[LandyEntityPayload] = underlyingGraph.vertices
-  val edges: EdgeRDD[LandyEntityPayload] = underlyingGraph.edges
+class Landy(attributeGraph: LandyAttributeGraph) extends TemporalGraph {
+  val underlyingGraph: LandyAttributeGraph = attributeGraph
 
   def snapshotAtTimeLandy(instant: Instant): Graph[LandyEntityPayload, LandyEntityPayload] = {
     val vertices = localVertices

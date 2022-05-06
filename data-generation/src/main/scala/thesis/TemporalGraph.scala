@@ -1,17 +1,46 @@
 package thesis
 
-import org.apache.spark.graphx.VertexId
+import org.apache.spark.graphx.{Edge, EdgeContext, EdgeRDD, EdgeTriplet, Graph, GraphOps, TripletFields, VertexId, VertexRDD}
 import org.apache.spark.rdd.RDD
-import thesis.DataTypes.{Attributes, EdgeId}
+import thesis.DataTypes.{AttributeGraph, Attributes, EdgeId}
 
 import java.time.Instant
+import scala.reflect.ClassTag
 
 abstract class TemporalGraph extends Serializable {
-  //  val vertices: VertexRDD[Attributes]
-  //  val edges: EdgeRDD[SnapshotEdgePayload]
-  //  val triplets: RDD[EdgeTriplet[Attributes, SnapshotEdgePayload]]
+  lazy val vertices: VertexRDD[Attributes] = graph.vertices
+  lazy val edges: EdgeRDD[SnapshotEdgePayload] = graph.edges
+  lazy val triplets: RDD[EdgeTriplet[Attributes, SnapshotEdgePayload]] = graph.triplets
+
+  lazy val graph: AttributeGraph = snapshotAtTime(Instant.now()).graph
+  lazy val ops: GraphOps[Attributes, SnapshotEdgePayload] = graph.ops
+
+  def getCurrentGraph: AttributeGraph = snapshotAtTime(Instant.now()).graph
+
+
+  def mapVertices[T: ClassTag](map: (VertexId, Attributes) => T): Graph[T, SnapshotEdgePayload] =
+    graph.mapVertices(map)
+
+  def mapEdges[T: ClassTag](map: Edge[SnapshotEdgePayload] => T): Graph[Attributes, T] =
+    graph.mapEdges(map)
+
+  def reverse: Graph[Attributes, SnapshotEdgePayload] = graph.reverse
+
 
   def snapshotAtTime(instant: Instant): Snapshot
+
+  def subgraph(
+                epred: EdgeTriplet[Attributes, SnapshotEdgePayload] => Boolean = (x => true),
+                vpred: (VertexId, Attributes) => Boolean = ((v, d) => true))
+  : Graph[Attributes, SnapshotEdgePayload]
+  = graph.subgraph(epred, vpred)
+
+  def aggregateMessages[A: ClassTag](
+                                      sendMsg: EdgeContext[Attributes, SnapshotEdgePayload, A] => Unit,
+                                      mergeMsg: (A, A) => A,
+                                      tripletFields: TripletFields = TripletFields.All)
+  : VertexRDD[A] =
+    graph.aggregateMessages(sendMsg, mergeMsg, tripletFields)
 
 
   /**
