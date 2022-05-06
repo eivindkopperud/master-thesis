@@ -103,7 +103,7 @@ class SnapshotDelta(val graphs: mutable.MutableList[Snapshot],
       })
       .filter(idWithInterval => interval.overlaps(idWithInterval._2))
       .map(_._1)
-      .distinct // Quickfix, there were duplicates returned
+      .distinct
   }
 
   /** Get entity at a certain point in time
