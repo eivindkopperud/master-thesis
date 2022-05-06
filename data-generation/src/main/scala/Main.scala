@@ -1,5 +1,6 @@
+import benchmarks.SnapshotMaterializationDifferanceBenchmark
 import thesis.PossibleWorkFlow
 
 object Main extends App {
-  PossibleWorkFlow.run()
+  new SnapshotMaterializationDifferanceBenchmark().run
 }
