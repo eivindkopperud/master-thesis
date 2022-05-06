@@ -12,7 +12,8 @@ import scala.collection.mutable
 import scala.math.Ordered.orderingToOrdered
 
 
-class Landy(underlyingGraph: LandyAttributeGraph) extends TemporalGraph {
+class Landy(attributeGraph: LandyAttributeGraph) extends TemporalGraph {
+  val underlyingGraph: LandyAttributeGraph = attributeGraph
 
   def snapshotAtTimeLandy(instant: Instant): Graph[LandyEntityPayload, LandyEntityPayload] = {
     val vertices = localVertices

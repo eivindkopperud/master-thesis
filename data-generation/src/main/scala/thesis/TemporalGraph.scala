@@ -8,21 +8,21 @@ import java.time.Instant
 import scala.reflect.ClassTag
 
 abstract class TemporalGraph extends Serializable {
-  val vertices: VertexRDD[Attributes] = snapshotAtTime(Instant.now()).graph.vertices
-  val edges: EdgeRDD[SnapshotEdgePayload] = snapshotAtTime(Instant.now()).graph.edges
-  val triplets: RDD[EdgeTriplet[Attributes, SnapshotEdgePayload]] = snapshotAtTime(Instant.now()).graph.triplets
+  val vertices: () => VertexRDD[Attributes] = () => snapshotAtTime(Instant.now()).graph.vertices
+  val edges: () => EdgeRDD[SnapshotEdgePayload] = () => snapshotAtTime(Instant.now()).graph.edges
+  val triplets: () => RDD[EdgeTriplet[Attributes, SnapshotEdgePayload]] = () => snapshotAtTime(Instant.now()).graph.triplets
 
-  val ops: GraphOps[Attributes, SnapshotEdgePayload] = graph.ops
-  val graph: AttributeGraph = snapshotAtTime(Instant.now()).graph
+  val graph: () => AttributeGraph = () => snapshotAtTime(Instant.now()).graph
+  val ops: GraphOps[Attributes, SnapshotEdgePayload] = graph().ops
 
 
   def mapVertices[T: ClassTag](map: (VertexId, Attributes) => T): Graph[T, SnapshotEdgePayload] =
-    graph.mapVertices(map)
+    graph().mapVertices(map)
 
   def mapEdges[T: ClassTag](map: Edge[SnapshotEdgePayload] => T): Graph[Attributes, T] =
-    graph.mapEdges(map)
+    graph().mapEdges(map)
 
-  def reverse: Graph[Attributes, SnapshotEdgePayload] = graph.reverse
+  def reverse: Graph[Attributes, SnapshotEdgePayload] = graph().reverse
 
 
   def snapshotAtTime(instant: Instant): Snapshot
@@ -31,14 +31,14 @@ abstract class TemporalGraph extends Serializable {
                 epred: EdgeTriplet[Attributes, SnapshotEdgePayload] => Boolean = (x => true),
                 vpred: (VertexId, Attributes) => Boolean = ((v, d) => true))
   : Graph[Attributes, SnapshotEdgePayload]
-  = graph.subgraph(epred, vpred)
+  = graph().subgraph(epred, vpred)
 
   def aggregateMessages[A: ClassTag](
                                       sendMsg: EdgeContext[Attributes, SnapshotEdgePayload, A] => Unit,
                                       mergeMsg: (A, A) => A,
                                       tripletFields: TripletFields = TripletFields.All)
   : VertexRDD[A] =
-    graph.aggregateMessages(sendMsg, mergeMsg, tripletFields)
+    graph().aggregateMessages(sendMsg, mergeMsg, tripletFields)
 
 
   /**

@@ -9,20 +9,20 @@ class LandyConsumerSpec extends AnyFlatSpec with SparkTestWrapper {
     implicit val sc: SparkContext = spark.sparkContext
     val logs = LogFactory().buildSingleSequence(VERTEX(10))
     val logsRDD = sc.parallelize(logs)
-    val graph = Landy(logsRDD)
+    val landy = Landy(logsRDD)
 
-    assert(graph.vertices.count() == 5)
-    assert(graph.edges.count() == 0)
+    assert(landy.underlyingGraph.vertices.count() == 5)
+    assert(landy.underlyingGraph.edges.count() == 0)
   }
 
   it can "consume edges" in {
     implicit val sc: SparkContext = spark.sparkContext
     val logs = LogFactory().buildSingleSequence(EDGE(1, 10, 11))
     val logsRDD = sc.parallelize(logs)
-    val graph = Landy(logsRDD)
+    val landy = Landy(logsRDD)
 
-    assert(graph.vertices.count() == 2)
-    assert(graph.edges.count() == 5)
+    assert(landy.underlyingGraph.vertices.count() == 2)
+    assert(landy.underlyingGraph.edges.count() == 5)
 
 
   }
