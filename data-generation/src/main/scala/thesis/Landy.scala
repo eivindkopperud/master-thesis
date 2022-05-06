@@ -54,7 +54,7 @@ class Landy(underlyingGraph: LandyAttributeGraph) extends TemporalGraph {
     }
     )
       .map(edge => if (edge.dstId == vertexId) edge.srcId else edge.dstId)
-      .distinct // Quickfix, there were duplicates returned
+      .distinct
   }
 
   override def activatedVertices(interval: Interval): RDD[VertexId] = {
