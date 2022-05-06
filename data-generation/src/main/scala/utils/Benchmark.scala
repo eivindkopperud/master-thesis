@@ -51,7 +51,7 @@ case class Benchmark(writer: Writer, inSeconds: Boolean = false, textPrefix: Str
       val start = System.nanoTime()
       function
       val end = System.nanoTime()
-      timings += (start - end)
+      timings += (end - start)
     })
     val avg = timings.sum / timings.length.toFloat
     val printString = if (inSeconds) {
