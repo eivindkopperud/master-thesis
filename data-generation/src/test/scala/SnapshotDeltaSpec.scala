@@ -216,8 +216,8 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
 
     // Assertions for 1L's neighbours through time
     assert(g.directNeighbours(1L, Interval(t1, t1)).collect().toSeq == Seq(2L))
-    assert(g.directNeighbours(1L, Interval(t2, t2)).collect().toSeq == Seq(2L, 3L))
-    assert(g.directNeighbours(1L, Interval(t2, t3)).collect().toSeq == Seq(2L, 3L))
+    assert(g.directNeighbours(1L, Interval(t2, t2)).collect().toSeq.sorted == Seq(2L, 3L))
+    assert(g.directNeighbours(1L, Interval(t2, t3)).collect().toSeq.sorted == Seq(2L, 3L))
     assert(g.directNeighbours(1L, Interval(t4, t4)).collect().toSeq == Seq(3L))
 
     // Assertions for 2L's neighbours through time

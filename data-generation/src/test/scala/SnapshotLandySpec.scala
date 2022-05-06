@@ -92,8 +92,6 @@ class SnapshotLandySpec extends FixtureAnyFlatSpec with SparkTestWrapper {
     vertices.foreach(v => {
       val lVertexIds = landyGraph.directNeighbours(v.id, bothBatches).collect().sorted
       val sdVertexIds = snapshotDeltaGraph.directNeighbours(v.id, bothBatches).collect().sorted
-      println(lVertexIds.mkString("Array(", ", ", ")"))
-      println(sdVertexIds.mkString("Array(", ", ", ")"))
       lVertexIds.zip(sdVertexIds).foreach({ case (vId, uId) => assert(vId == uId) })
     }
     )
