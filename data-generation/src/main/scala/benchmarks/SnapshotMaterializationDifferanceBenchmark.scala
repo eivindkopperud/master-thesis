@@ -2,24 +2,34 @@ package benchmarks
 
 import factories.LogFactory
 import thesis.SnapshotIntervalType.Count
-import thesis.{SnapshotDelta, VERTEX}
+import thesis.{Snapshot, SnapshotDelta, VERTEX}
+
+import java.time.Instant
 
 class SnapshotMaterializationDifferanceBenchmark(
-                                                  iterationCount: Int = 100,
+                                                  iterationCount: Int = 11,
                                                   customColumn: String = "logs since last materialization"
                                                 ) extends QueryBenchmark(iterationCount, customColumn) {
-  val numLogs = 10000
+  val numLogs = 100
   val logs = LogFactory().buildSingleSequenceWithDelete(VERTEX(1), updateAmount = numLogs)
-  val snapshotGraph = SnapshotDelta(sc.parallelize(logs), Count(1000))
+  val snapshotGraph: SnapshotDelta = SnapshotDelta(sc.parallelize(logs), Count(10))
 
   override def warmUp(): Unit = {
-    for (i <- 1 until 100) snapshotGraph.snapshotAtTime(logs.head.timestamp)
+    val Snapshot(graph, _) = snapshotGraph.snapshotAtTime(logs(numLogs / 2).timestamp)
+    graph.edges.collect()
+    graph.vertices.collect()
   }
 
   override def execute(iteration: Int): Unit = {
-    val materializationOffset = (iteration - 51) * 10
+    val materializationOffset = (iteration - 2) % 10
     val timestamp = logs(numLogs / 2 + materializationOffset).timestamp
-    System.gc()
-    benchmarks(0).benchmarkAvg(snapshotGraph.snapshotAtTime(timestamp), numberOfRuns = 10, customColumnValue = materializationOffset.toString)
+    sc.getPersistentRDDs.foreach(_._2.unpersist())
+    benchmarks(0).benchmarkAvg(doQuery(timestamp), numberOfRuns = 5, customColumnValue = materializationOffset.toString)
+  }
+
+  def doQuery(timestamp: Instant): Unit = {
+    val Snapshot(graph, _) = snapshotGraph.snapshotAtTime(timestamp)
+    graph.vertices.collect()
+    graph.edges.collect()
   }
 }
