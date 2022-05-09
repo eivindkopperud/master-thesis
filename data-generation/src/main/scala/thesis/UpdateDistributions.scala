@@ -161,7 +161,7 @@ object UpdateDistributions {
 
     val edgeIdWithTimestamp = edges.map(edge => {
       val distribution = getSortedUniformDistribution(edge.attr.interval.start.getEpochSecond, edge.attr.interval.stop.getEpochSecond, edge.attr.count)
-      (EDGE(uuid, edge.srcId, edge.dstId), (edge.attr.interval, distribution)) // Add Surrogate key
+      (EDGE(uuid, edge.srcId, edge.dstId), (edge.attr.interval, distribution))
     })
     val edgeLogs = edgeIdWithTimestamp.map(edge => {
       val (ids, (interval, timestamps)) = edge
@@ -200,7 +200,7 @@ object UpdateDistributions {
     generateLogs(g)
   }
 
-  def getLogger: Logger = LoggerFactory.getLogger("UpdateDistributionSpec")
+  def getLogger: Logger = LoggerFactory.getLogger("UpdateDistribution")
 
   def saveLogs(logs: RDD[LogTSV], path: String = "stored_logs"): RDD[LogTSV] = {
     logs.saveAsObjectFile(path)

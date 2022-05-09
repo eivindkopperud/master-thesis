@@ -16,6 +16,7 @@ libraryDependencies ++= Seq(
 )
 
 Test / testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-oDF") // Display runtime for tests
+Global / cancelable := true
 
 
 scalaVersion := "2.12.15"

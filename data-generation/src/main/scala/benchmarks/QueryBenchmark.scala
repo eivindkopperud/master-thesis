@@ -1,12 +1,17 @@
 package benchmarks
 
 import org.apache.spark.SparkContext
+import org.apache.spark.sql.SparkSession
+import org.slf4j.{Logger, LoggerFactory}
 import thesis.SparkConfiguration.getSparkSession
-import utils.{Benchmark, FileWriter}
+import utils.{Benchmark, BothWriter}
 
 abstract class QueryBenchmark(val iterationCount: Int, val customColumn: String, benchmarkSuffixes: Seq[String] = Seq()) extends Serializable {
   implicit val sc: SparkContext = getSparkSession.sparkContext
+  implicit val spark: SparkSession = getSparkSession
   var benchmarks: Seq[Benchmark] = Seq()
+
+  def getLogger: Logger = LoggerFactory.getLogger(getClass.getSimpleName)
 
   def run: Unit = {
     initialize
@@ -27,14 +32,14 @@ abstract class QueryBenchmark(val iterationCount: Int, val customColumn: String,
   }
 
   def initializeSingle(): Unit = {
-    val fileWriter = FileWriter(filename = getClass.getSimpleName)
+    val fileWriter = BothWriter(filename = getClass.getSimpleName)
     benchmarks = benchmarks :+ Benchmark(fileWriter, textPrefix = getClass.getSimpleName, customColumn = customColumn)
   }
 
   def initializeMultiple(benchmarkSuffixes: Seq[String]): Unit = {
     benchmarkSuffixes.foreach(suffix => {
       val benchmarkId = s"${getClass.getSimpleName}-$suffix"
-      val fileWriter = FileWriter(filename = benchmarkId)
+      val fileWriter = BothWriter(filename = benchmarkId)
       benchmarks = benchmarks :+ Benchmark(fileWriter, textPrefix = benchmarkId, customColumn = customColumn)
     })
   }
