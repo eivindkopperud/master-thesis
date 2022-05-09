@@ -1,6 +1,23 @@
 package utils
 
 import org.apache.spark.graphx.{Edge, VertexId}
+
+/** Dictionary
+ * With some help from discord this case class was made
+ *
+ * Use:
+ * {{{
+ *  val config = Dictionary(urHashMap)
+ *  val myVariable = config[YourType]("yourKey")
+ *  //instead of
+ *  val config = urHashMap
+ *  val myVariable = config("yourkey").asInstanceOf[YourType]
+ * }}}
+ */
+
+case class Dictionary(inner: Map[String, Any]) {
+  def apply[V](key: String): V = inner(key).asInstanceOf[V]
+}
 import thesis.DataTypes.{AttributeGraph, Attributes}
 import thesis.SnapshotEdgePayload
 
