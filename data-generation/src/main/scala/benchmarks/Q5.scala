@@ -6,10 +6,10 @@ import thesis.{Snapshot, SnapshotDelta, VERTEX}
 
 import java.time.Instant
 
-class SnapshotMaterializationDifferanceBenchmark(
-                                                  iterationCount: Int = 10,
-                                                  customColumn: String = "logs since last materialization"
-                                                ) extends QueryBenchmark(iterationCount, customColumn) {
+class Q5(
+          iterationCount: Int = 10,
+          customColumn: String = "logs since last materialization"
+        ) extends QueryBenchmark(iterationCount, customColumn) {
   val numLogs = 100
   val logs = LogFactory().buildSingleSequenceWithDelete(VERTEX(1), updateAmount = numLogs)
   val snapshotGraph: SnapshotDelta = SnapshotDelta(sc.parallelize(logs), Count(10))
