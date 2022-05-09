@@ -7,18 +7,12 @@ import thesis.{Snapshot, SnapshotDelta, VERTEX}
 import java.time.Instant
 
 class SnapshotMaterializationDifferanceBenchmark(
-                                                  iterationCount: Int = 11,
+                                                  iterationCount: Int = 10,
                                                   customColumn: String = "logs since last materialization"
                                                 ) extends QueryBenchmark(iterationCount, customColumn) {
   val numLogs = 100
   val logs = LogFactory().buildSingleSequenceWithDelete(VERTEX(1), updateAmount = numLogs)
   val snapshotGraph: SnapshotDelta = SnapshotDelta(sc.parallelize(logs), Count(10))
-
-  override def warmUp(): Unit = {
-    val Snapshot(graph, _) = snapshotGraph.snapshotAtTime(logs(numLogs / 2).timestamp)
-    graph.edges.collect()
-    graph.vertices.collect()
-  }
 
   override def execute(iteration: Int): Unit = {
     val materializationOffset = (iteration - 2) % 10
