@@ -25,41 +25,38 @@ Test / testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-oDF") // Displa
 scalaVersion := "2.12.15"
 
 //https://coderwall.com/p/6gr84q/sbt-assembly-spark-and-you
- ThisBuild / assemblyMergeStrategy := {
-  case PathList("org","aopalliance", xs @ _*) => MergeStrategy.last
-  case PathList("javax", "inject", xs @ _*) => MergeStrategy.last
-  case PathList("javax", "servlet", xs @ _*) => MergeStrategy.last
-  case PathList("javax", "activation", xs @ _*) => MergeStrategy.last
-  case PathList("org", "apache", xs @ _*) => MergeStrategy.last
-  case PathList("com", "google", xs @ _*) => MergeStrategy.last
-  case PathList("com", "esotericsoftware", xs @ _*) => MergeStrategy.last
-  case PathList("com", "codahale", xs @ _*) => MergeStrategy.last
-  case PathList("com", "yammer", xs @ _*) => MergeStrategy.last
-  case PathList("jackson", xs @ _*) => MergeStrategy.last
-  case PathList("io","netty", xs @ _*) => MergeStrategy.last
-  case PathList("com","fasterxml", xs @ _*) => MergeStrategy.last
+ThisBuild / assemblyMergeStrategy := {
+  case PathList("org", "aopalliance", xs@_*) => MergeStrategy.last
+  case PathList("javax", "inject", xs@_*) => MergeStrategy.last
+  case PathList("javax", "servlet", xs@_*) => MergeStrategy.last
+  case PathList("javax", "activation", xs@_*) => MergeStrategy.last
+  case PathList("org", "apache", xs@_*) => MergeStrategy.last
+  case PathList("com", "google", xs@_*) => MergeStrategy.last
+  case PathList("com", "esotericsoftware", xs@_*) => MergeStrategy.last
+  case PathList("com", "codahale", xs@_*) => MergeStrategy.last
+  case PathList("com", "yammer", xs@_*) => MergeStrategy.last
+  case PathList("jackson", xs@_*) => MergeStrategy.last
+  case PathList("io", "netty", xs@_*) => MergeStrategy.first
+  case PathList("com", "fasterxml", xs@_*) => MergeStrategy.last
   case "about.html" => MergeStrategy.rename
   case "META-INF/ECLIPSEF.RSA" => MergeStrategy.last
   case "META-INF/mailcap" => MergeStrategy.last
   case "META-INF/mimetypes.default" => MergeStrategy.last
   case "META-INF/io.netty.versions.properties" => MergeStrategy.last
   case "git.properties" => MergeStrategy.last
-  case "overview.html" => MergeStrategy.last  // Added this for 2.1.0 I think
+  case "overview.html" => MergeStrategy.last // Added this for 2.1.0 I think
   case x if x endsWith "native-image.properties" => MergeStrategy.last
-  case x if x endsWith "module-info.class"  => MergeStrategy.discard
-  case x if x endsWith "reflection-config.json"  => MergeStrategy.last
-  case x if x endsWith "Resource$AuthenticationType.class"  => MergeStrategy.last
+  case x if x endsWith "module-info.class" => MergeStrategy.discard
+  case x if x endsWith "reflection-config.json" => MergeStrategy.last
+  case x if x endsWith "Resource$AuthenticationType.class" => MergeStrategy.last
+  case x if x endsWith "nowarn$.class" => MergeStrategy.last
+  case x if x endsWith "nowarn.class" => MergeStrategy.last
   case x =>
-    val oldStrategy = (assembly / assemblyMergeStrategy ).value
+    val oldStrategy = (assembly / assemblyMergeStrategy).value
     oldStrategy(x)
 }
 /* you need to be able to undo the "provided" annotation on the deps when running your spark 
    programs locally i.e. from sbt; this bit reincludes the full classpaths in the compile and run tasks. */
 /* including scala bloats your assembly jar unnecessarily, and may interfere with 
    spark runtime */
-Runtime / fullClasspath := (fullClasspath in (Compile, run)).value
-
-assembly / assemblyOption ~= {
-      _.withIncludeScala(false)
-    },
-
+Runtime / fullClasspath := (fullClasspath in(Compile, run)).value
