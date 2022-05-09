@@ -1,7 +1,7 @@
 package thesis
 
 import breeze.plot.{Figure, hist}
-import breeze.stats.distributions.{Gaussian, LogNormal, Uniform}
+import breeze.stats.distributions.{Gaussian, LogNormal, Uniform, ZipfDistribution}
 import factories.LogFactory
 import org.apache.spark.SparkContext
 import org.apache.spark.graphx.{Edge, Graph, VertexId, VertexRDD}
@@ -123,6 +123,7 @@ object UpdateDistributions {
       case DistributionType.LogNormalType(mu, sigma) => LogNormal(mu, sigma).draw().toInt
       case DistributionType.GaussianType(mu, sigma) => Gaussian(mu, sigma).draw().toInt
       case DistributionType.UniformType(low, high) => Uniform(low, high).draw().toInt
+      case DistributionType.ZipfType(maxValue, exponent) => ZipfDistribution(maxValue, exponent).draw()
     }
   }
 
