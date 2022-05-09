@@ -9,6 +9,6 @@
 
 </br></br></br></br></br></br>
 <footer>
-    <em> Disclaimer: Tempura is created as part of a master thesis at Norwegian University of Science and Technology (NTNU) by @TheodoRene and @eivindkopperud. </em>
+    <em> Disclaimer: Tempura is created as part of a master thesis at Norwegian University of Science and Technology (NTNU) by @TheodorRene and @eivindkopperud. </em>
 </footer>
  
