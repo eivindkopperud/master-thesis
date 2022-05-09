@@ -1,11 +1,13 @@
 package benchmarks
 
 import org.apache.spark.SparkContext
+import org.apache.spark.sql.SparkSession
 import thesis.SparkConfiguration.getSparkSession
 import utils.{Benchmark, FileWriter}
 
 abstract class QueryBenchmark(val iterationCount: Int, val customColumn: String, benchmarkSuffixes: Seq[String] = Seq()) extends Serializable {
-  implicit val sc: SparkContext = getSparkSession.sparkContext
+  implicit val spark: SparkSession = getSparkSession
+  implicit val sc: SparkContext = spark.sparkContext
   var benchmarks: Seq[Benchmark] = Seq()
 
   def run: Unit = {
@@ -41,4 +43,6 @@ abstract class QueryBenchmark(val iterationCount: Int, val customColumn: String,
   def execute(iteration: Int): Unit
 
   def tearDown(): Unit = benchmarks.foreach(_.close())
+
+  def unpersist(): Unit = sc.getPersistentRDDs.foreach(_._2.unpersist())
 }
