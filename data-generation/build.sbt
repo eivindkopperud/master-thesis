@@ -55,8 +55,4 @@ ThisBuild / assemblyMergeStrategy := {
     val oldStrategy = (assembly / assemblyMergeStrategy).value
     oldStrategy(x)
 }
-/* you need to be able to undo the "provided" annotation on the deps when running your spark 
-   programs locally i.e. from sbt; this bit reincludes the full classpaths in the compile and run tasks. */
-/* including scala bloats your assembly jar unnecessarily, and may interfere with 
-   spark runtime */
-Runtime / fullClasspath := (fullClasspath in(Compile, run)).value
+Compile / run := Defaults.runTask(Compile / fullClasspath, Compile / run / mainClass, Compile / run / runner).evaluated

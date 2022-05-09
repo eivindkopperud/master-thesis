@@ -12,6 +12,6 @@ object SparkConfiguration {
       .set("spark.driver.memory", "2g")
     SparkSession.builder.config(conf).getOrCreate()
   }
-
-
+  //.setMaster("spark://spark:7077")
+  // use the line above when making an uberjar
 }
