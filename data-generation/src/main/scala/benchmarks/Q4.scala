@@ -1,7 +1,7 @@
 package benchmarks
 
 import org.apache.spark.graphx.Graph
-import thesis.DataSource.{ContactsHyperText, Reptilian}
+import thesis.DataSource.ContactsHyperText
 import thesis.DistributionType.UniformType
 import thesis.SnapshotIntervalType.Count
 import thesis.TopologyGraphGenerator.generateGraph
@@ -21,7 +21,6 @@ class Q4(
   val distribution = (iteration: Int) => UniformType(1, 1 + 2 * iteration)
   val timestamp = 1082148639L
   val intervalDelta = 1000
-  val vertexId = 37
 
   lazy val graph: Graph[Long, Interval] = {
     generateGraph(threshold, dataSource).mapEdges(edge => {
@@ -45,8 +44,16 @@ class Q4(
     snapshotDeltaGraph.activatedEntities(Interval(0, 0))
 
     unpersist()
-    benchmarks(0).benchmarkAvg(landyGraph.activatedEntities(interval), numberOfRuns = 5, customColumnValue = expectedLogPrEntity)
+    benchmarks(0).benchmarkAvg({
+      val (vertexIds, edgeIds) = landyGraph.activatedEntities(interval)
+      vertexIds.collect()
+      edgeIds.collect()
+    }, customColumnValue = expectedLogPrEntity)
     unpersist()
-    benchmarks(1).benchmarkAvg(snapshotDeltaGraph.activatedEntities(interval), numberOfRuns = 5, customColumnValue = expectedLogPrEntity)
+    benchmarks(1).benchmarkAvg({
+      val (vertexIds, edgeIds) = snapshotDeltaGraph.activatedEntities(interval)
+      vertexIds.collect()
+      edgeIds.collect()
+    }, customColumnValue = expectedLogPrEntity)
   }
 }

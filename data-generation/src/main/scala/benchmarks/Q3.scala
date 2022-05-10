@@ -6,7 +6,7 @@ import thesis.DistributionType.UniformType
 import thesis.SnapshotIntervalType.Count
 import thesis.TopologyGraphGenerator.generateGraph
 import thesis.UpdateDistributions.{addGraphUpdateDistribution, generateLogs}
-import thesis.{Interval, Landy, SnapshotDelta, VERTEX}
+import thesis.{DataSource, Interval, Landy, SnapshotDelta, VERTEX}
 import utils.TimeUtils.secondsToInstant
 
 class Q3(
@@ -15,8 +15,8 @@ class Q3(
           benchmarkSuffixes: Seq[String] = Seq("landy", "snapshot")
         ) extends QueryBenchmark(iterationCount, customColumn, benchmarkSuffixes) {
   val threshold = 40
-  val dataSource = ContactsHyperText
-  val distribution = (iteration: Int) => UniformType(1, 1 + 2 * iteration)
+  val dataSource: DataSource = ContactsHyperText
+  val distribution: Int => UniformType = (iteration: Int) => UniformType(1, 1 + 2 * iteration)
   val timestamp = 1082148639L
   val intervalDelta = 1000
   val vertexId = 37
@@ -42,8 +42,8 @@ class Q3(
     snapshotDeltaGraph.getEntity(VERTEX(vertexId), 0L)
 
     unpersist()
-    benchmarks(0).benchmarkAvg(landyGraph.getEntity(VERTEX(vertexId), timestamp), numberOfRuns = 5, customColumnValue = expectedLogPrEntity)
+    benchmarks(0).benchmarkAvg(landyGraph.getEntity(VERTEX(vertexId), timestamp), customColumnValue = expectedLogPrEntity)
     unpersist()
-    benchmarks(1).benchmarkAvg(snapshotDeltaGraph.getEntity(VERTEX(vertexId), timestamp), numberOfRuns = 5, customColumnValue = expectedLogPrEntity)
+    benchmarks(1).benchmarkAvg(snapshotDeltaGraph.getEntity(VERTEX(vertexId), timestamp), customColumnValue = expectedLogPrEntity)
   }
 }

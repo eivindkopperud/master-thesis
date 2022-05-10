@@ -6,7 +6,7 @@ import thesis.DistributionType.UniformType
 import thesis.SnapshotIntervalType.Count
 import thesis.TopologyGraphGenerator.generateGraph
 import thesis.UpdateDistributions.{addGraphUpdateDistribution, generateLogs}
-import thesis.{Interval, Landy, SnapshotDelta, VERTEX}
+import thesis.{Interval, Landy, SnapshotDelta}
 import utils.TimeUtils.secondsToInstant
 
 /** Benchmark landy snapshot with a variation of log numbers. */
@@ -20,7 +20,6 @@ class Q2(
   val distribution = (iteration: Int) => UniformType(1, 1 + 2 * iteration)
   val timestamp = 1082148639L
   val intervalDelta = 1000
-  val vertexId = 37
 
   lazy val graph: Graph[Long, Interval] = {
     generateGraph(threshold, dataSource).mapEdges(edge => {
@@ -43,9 +42,17 @@ class Q2(
     landyGraph.snapshotAtTime(0)
 
     unpersist()
-    benchmarks(0).benchmarkAvg(landyGraph.snapshotAtTime(timestamp), numberOfRuns = 5, customColumnValue = expectedLogPrEntity)
+    benchmarks(0).benchmarkAvg({
+      val g = landyGraph.snapshotAtTime(timestamp)
+      g.graph.edges.collect()
+      g.graph.vertices.collect()
+    }, customColumnValue = expectedLogPrEntity)
     unpersist()
-    benchmarks(1).benchmarkAvg(snapshotDeltaGraph.snapshotAtTime(timestamp), numberOfRuns = 5, customColumnValue = expectedLogPrEntity)
+    benchmarks(1).benchmarkAvg({
+      val g = snapshotDeltaGraph.snapshotAtTime(timestamp)
+      g.graph.edges.collect()
+      g.graph.vertices.collect()
+    }, customColumnValue = expectedLogPrEntity)
 
   }
 }

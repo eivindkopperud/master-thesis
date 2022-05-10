@@ -45,7 +45,7 @@ case class Benchmark(writer: Writer, inSeconds: Boolean = false, textPrefix: Str
     returnValue
   }
 
-  def benchmarkAvg[T](function: => T, numberOfRuns: Int = 1, textPrefix: String = textPrefix, customColumnValue: String = ""): Unit = {
+  def benchmarkAvg[T](function: => T, numberOfRuns: Int = 5, textPrefix: String = textPrefix, customColumnValue: String = ""): Unit = {
     val timings = mutable.MutableList[Long]()
     (1 to numberOfRuns) foreach (_ => {
       val start = System.nanoTime()

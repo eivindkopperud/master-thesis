@@ -1,7 +1,7 @@
 package benchmarks
 
 import org.apache.spark.graphx.Graph
-import thesis.DataSource.{ContactsHyperText, Reptilian}
+import thesis.DataSource.ContactsHyperText
 import thesis.DistributionType.UniformType
 import thesis.SnapshotIntervalType.Count
 import thesis.TopologyGraphGenerator.generateGraph
@@ -45,8 +45,8 @@ class Q1(
     snapshotDeltaGraph.directNeighbours(vertexId, Interval(0, 0))
 
     unpersist()
-    benchmarks(0).benchmarkAvg(landyGraph.directNeighbours(vertexId, interval), numberOfRuns = 5, customColumnValue = expectedLogPrEntity)
+    benchmarks(0).benchmarkAvg(landyGraph.directNeighbours(vertexId, interval).collect(), customColumnValue = expectedLogPrEntity)
     unpersist()
-    benchmarks(1).benchmarkAvg(snapshotDeltaGraph.directNeighbours(vertexId, interval), numberOfRuns = 5, customColumnValue = expectedLogPrEntity)
+    benchmarks(1).benchmarkAvg(snapshotDeltaGraph.directNeighbours(vertexId, interval).collect(), customColumnValue = expectedLogPrEntity)
   }
 }
