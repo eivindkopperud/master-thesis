@@ -20,6 +20,7 @@ libraryDependencies ++= Seq(
 )
 
 Test / testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-oDF") // Display runtime for tests
+assemblyOutputPath in assembly := file("uber.jar")
 
 
 scalaVersion := "2.12.15"
