@@ -40,6 +40,10 @@ class Q1(
     val expectedLogPrEntity = (iteration + 1).toString
     val interval = Interval(0, Instant.MAX)
 
+    // Warm up to ensure the first doesn't require more work.
+    landyGraph.directNeighbours(vertexId, Interval(0, 0))
+    snapshotDeltaGraph.directNeighbours(vertexId, Interval(0, 0))
+
     unpersist()
     benchmarks(0).benchmarkAvg(landyGraph.directNeighbours(vertexId, interval), numberOfRuns = 5, customColumnValue = expectedLogPrEntity)
     unpersist()

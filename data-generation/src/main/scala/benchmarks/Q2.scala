@@ -38,6 +38,10 @@ class Q2(
 
     val expectedLogPrEntity = (iteration + 1).toString
 
+    // Warm up to ensure the first doesn't require more work.
+    landyGraph.snapshotAtTime(0)
+    landyGraph.snapshotAtTime(0)
+
     unpersist()
     benchmarks(0).benchmarkAvg(landyGraph.snapshotAtTime(timestamp), numberOfRuns = 5, customColumnValue = expectedLogPrEntity)
     unpersist()

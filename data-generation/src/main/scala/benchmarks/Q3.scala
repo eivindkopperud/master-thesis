@@ -37,6 +37,10 @@ class Q3(
 
     val expectedLogPrEntity = (iteration + 1).toString
 
+    // Warm up to ensure the first doesn't require more work.
+    landyGraph.getEntity(VERTEX(vertexId), 0L)
+    snapshotDeltaGraph.getEntity(VERTEX(vertexId), 0L)
+
     unpersist()
     benchmarks(0).benchmarkAvg(landyGraph.getEntity(VERTEX(vertexId), timestamp), numberOfRuns = 5, customColumnValue = expectedLogPrEntity)
     unpersist()

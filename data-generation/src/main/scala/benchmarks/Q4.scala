@@ -40,6 +40,10 @@ class Q4(
     val expectedLogPrEntity = (iteration + 1).toString
     val interval = Interval(0, Instant.MAX)
 
+    // Warm up to ensure the first doesn't require more work.
+    landyGraph.activatedEntities(Interval(0, 0))
+    snapshotDeltaGraph.activatedEntities(Interval(0, 0))
+
     unpersist()
     benchmarks(0).benchmarkAvg(landyGraph.activatedEntities(interval), numberOfRuns = 5, customColumnValue = expectedLogPrEntity)
     unpersist()
