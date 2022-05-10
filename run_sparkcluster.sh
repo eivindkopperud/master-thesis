@@ -17,10 +17,10 @@ docker container rm -f $worker
 
 
 log "Deleting old network"
-docker network rm $network || ls
+#docker network rm $network || ls
 
 log "Creating network"
-docker network create --driver bridge $network
+#docker network create --driver bridge $network
 
 log "Starting Master"
 docker run -d \
@@ -42,6 +42,7 @@ docker run -d \
     -p 127.0.0.1:8081:8081 \
     -h spark-worker \
     --network $network \
+    --user 0:0 \
     -e SPARK_MODE=worker \
     -e SPARK_MASTER_URL=spark://spark:7077 \
     -e SPARK_RPC_AUTHENTICATION_ENABLED=no \
