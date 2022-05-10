@@ -24,7 +24,6 @@ docker run \
     --name $driver \
     --network $network \
     -h spark-driver \
-    -v "$(pwd)/jars:/jars" \
-    -v "$(pwd)/data-generation:/source-code" \
+    -v "$(pwd)/data-generation:/root/MASTER" \
     hseeberger/scala-sbt:11.0.14.1_1.6.2_2.12.15 \
     bash

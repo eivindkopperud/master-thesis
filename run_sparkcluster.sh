@@ -40,6 +40,7 @@ log "Starting Worker "
 docker run -d \
     --name $worker \
     -p 127.0.0.1:8081:8081 \
+    -p 127.0.0.1:4040:4040 \
     -h spark-worker \
     --network $network \
     --user 0:0 \
@@ -49,7 +50,6 @@ docker run -d \
     -e SPARK_RPC_ENCRYPTION_ENABLED=no \
     -e SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no \
     -e SPARK_SSL_ENABLED=no \
-    -v "$(pwd)/jars:/jars" \
-    -v "$(pwd)/data-generation:/source-code" \
+    -v "$(pwd)/data-generation:/opt/bitnami/spark/MASTER" \
     bitnami/spark:$version \
 
