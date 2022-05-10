@@ -49,5 +49,6 @@ docker run -d \
     -e SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no \
     -e SPARK_SSL_ENABLED=no \
     -v "$(pwd)/jars:/jars" \
+    -v "$(pwd)/data-generation:/source-code" \
     bitnami/spark:$version \
 
