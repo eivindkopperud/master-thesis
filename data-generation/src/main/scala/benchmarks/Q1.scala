@@ -14,20 +14,27 @@ class Q1(
         ) extends ComparisonBenchmark(iterationCount, customColumn, benchmarkSuffixes) {
 
   override def execute(iteration: Int): Unit = {
+    logger.warn(s"i $iteration: Generating distribution")
     val g = addGraphUpdateDistribution(graph, distribution(iteration))
+    logger.warn(s"i $iteration: Generating logs")
     val logs = generateLogs(g)
 
+    logger.warn(s"i $iteration: Generating graphs")
     val landyGraph = Landy(logs)
     val snapshotDeltaGraph = SnapshotDelta(logs, Count(intervalDelta))
 
     val interval = Interval(0, Instant.MAX)
 
     // Warm up to ensure the first doesn't require more work.
+    logger.warn(s"i $iteration: Running warmup")
     landyGraph.directNeighbours(vertexId, Interval(0, 0))
     snapshotDeltaGraph.directNeighbours(vertexId, Interval(0, 0))
 
+    logger.warn(s"i $iteration: Unpersisting, then running landy")
     unpersist()
     benchmarks(0).benchmarkAvg(landyGraph.directNeighbours(vertexId, interval).collect(), customColumnValue = getMean(iteration).toString)
+
+    logger.warn(s"i $iteration: Unpersisting, then running snapshotsdelta")
     unpersist()
     benchmarks(1).benchmarkAvg(snapshotDeltaGraph.directNeighbours(vertexId, interval).collect(), customColumnValue = getMean(iteration).toString)
   }
