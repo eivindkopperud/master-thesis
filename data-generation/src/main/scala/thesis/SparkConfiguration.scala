@@ -10,6 +10,8 @@ object SparkConfiguration {
     val conf = new SparkConf()
       .setAppName("data-generation")
       .setMaster(getConfigSafe("SparkConfigurationMaster").getOrElse("local[2]"))
+      .set("spark.driver.memory", getConfigSafe("SparkDriverMemory").getOrElse("2g"))
+      .set("spark.executor.memory", getConfigSafe("SparkExecutorMemory").getOrElse("2g"))
     SparkSession.builder.config(conf).getOrCreate()
   }
   //.setMaster("local[2]")
