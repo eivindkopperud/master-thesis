@@ -29,8 +29,8 @@ class Q1(
 
     // Warm up to ensure the first doesn't require more work.
     logger.warn(s"i $iteration: Running warmup")
-    landyGraph.directNeighbours(vertexId, Interval(0, 0))
-    snapshotDeltaGraph.directNeighbours(vertexId, Interval(0, 0))
+    landyGraph.directNeighbours(vertexId, Interval(0, 0)).collect()
+    snapshotDeltaGraph.directNeighbours(vertexId, Interval(0, 0)).collect()
 
     logger.warn(s"i $iteration: Unpersisting, then running landy")
     unpersist()
