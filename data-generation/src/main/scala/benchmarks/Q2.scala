@@ -8,7 +8,7 @@ import utils.TimeUtils.secondsToInstant
 /** Benchmark landy snapshot with a variation of log numbers. */
 class Q2(
           iterationCount: Int = 5,
-          customColumn: String = "average number of logs for each entity",
+          customColumn: String = "Number of logs",
           benchmarkSuffixes: Seq[String] = Seq("landy", "snapshot")
         ) extends ComparisonBenchmark(iterationCount, customColumn, benchmarkSuffixes) {
 
@@ -18,7 +18,8 @@ class Q2(
     logger.warn(s"i $iteration: Generating logs")
     val logs = generateLogs(g)
 
-    logger.warn(s"i $iteration: Number of logs ${logs.count()}")
+    val numberOfLogs = logs.count().toString
+    logger.warn(s"i $iteration: Number of logs $numberOfLogs")
 
     logger.warn(s"i $iteration: Generating graphs")
     val landyGraph = Landy(logs)
@@ -37,7 +38,7 @@ class Q2(
       val g = landyGraph.snapshotAtTime(timestamp)
       g.graph.edges.collect()
       g.graph.vertices.collect()
-    }, customColumnValue = getMean(iteration).toString)
+    }, customColumnValue = numberOfLogs)
 
     logger.warn(s"i $iteration: Unpersisting, then running snapshotsdelta")
     unpersist()
@@ -45,7 +46,7 @@ class Q2(
       val g = snapshotDeltaGraph.snapshotAtTime(timestamp)
       g.graph.edges.collect()
       g.graph.vertices.collect()
-    }, customColumnValue = getMean(iteration).toString)
+    }, customColumnValue = numberOfLogs)
 
   }
 }

@@ -9,7 +9,7 @@ import java.time.Instant
 
 class Q4(
           iterationCount: Int = 5,
-          customColumn: String = "average number of logs for each entity",
+          customColumn: String = "Number of logs",
           benchmarkSuffixes: Seq[String] = Seq("landy", "snapshot")
         ) extends ComparisonBenchmark(iterationCount, customColumn, benchmarkSuffixes) {
 
@@ -19,7 +19,8 @@ class Q4(
     logger.warn(s"i $iteration: Generating logs")
     val logs = generateLogs(g)
 
-    logger.warn(s"i $iteration: Number of logs ${logs.count()}")
+    val numberOfLogs = logs.count().toString
+    logger.warn(s"i $iteration: Number of logs $numberOfLogs")
 
     logger.warn(s"i $iteration: Generating graphs")
     val landyGraph = Landy(logs)
@@ -39,7 +40,7 @@ class Q4(
       val (vertexIds, edgeIds) = landyGraph.activatedEntities(interval)
       vertexIds.collect()
       edgeIds.collect()
-    }, customColumnValue = getMean(iteration).toString)
+    }, customColumnValue = numberOfLogs)
 
     logger.warn(s"i $iteration: Unpersisting, then running snapshotsdelta")
     unpersist()
@@ -47,6 +48,6 @@ class Q4(
       val (vertexIds, edgeIds) = snapshotDeltaGraph.activatedEntities(interval)
       vertexIds.collect()
       edgeIds.collect()
-    }, customColumnValue = getMean(iteration).toString)
+    }, customColumnValue = numberOfLogs)
   }
 }

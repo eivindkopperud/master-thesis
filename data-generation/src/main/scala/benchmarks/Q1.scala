@@ -9,7 +9,7 @@ import java.time.Instant
 
 class Q1(
           iterationCount: Int = 5,
-          customColumn: String = "average number of logs for each entity",
+          customColumn: String = "number of logs",
           benchmarkSuffixes: Seq[String] = Seq("landy", "snapshot")
         ) extends ComparisonBenchmark(iterationCount, customColumn, benchmarkSuffixes) {
 
@@ -19,7 +19,8 @@ class Q1(
     logger.warn(s"i $iteration: Generating logs")
     val logs = generateLogs(g)
 
-    logger.warn(s"i $iteration: Number of logs ${logs.count()}")
+    val numberOfLogs = logs.count()
+    logger.warn(s"i $iteration: Number of logs $numberOfLogs")
 
     logger.warn(s"i $iteration: Generating graphs")
     val landyGraph = Landy(logs)
@@ -34,10 +35,10 @@ class Q1(
 
     logger.warn(s"i $iteration: Unpersisting, then running landy")
     unpersist()
-    benchmarks(0).benchmarkAvg(landyGraph.directNeighbours(vertexId, interval).collect(), customColumnValue = getMean(iteration).toString)
+    benchmarks(0).benchmarkAvg(landyGraph.directNeighbours(vertexId, interval).collect(), customColumnValue = numberOfLogs.toString)
 
     logger.warn(s"i $iteration: Unpersisting, then running snapshotsdelta")
     unpersist()
-    benchmarks(1).benchmarkAvg(snapshotDeltaGraph.directNeighbours(vertexId, interval).collect(), customColumnValue = getMean(iteration).toString)
+    benchmarks(1).benchmarkAvg(snapshotDeltaGraph.directNeighbours(vertexId, interval).collect(), customColumnValue = numberOfLogs.toString)
   }
 }
