@@ -25,7 +25,7 @@ class ComparisonBenchmark(iterationCount: Int = 5,
   }
 
   def getMean(iteration: Int): Double = distributionType match {
-    case _: LogNormalType => LogNormal(param1, param2).mean
+    case _: LogNormalType => LogNormal(param1, iteration * param2).mean
     case _: GaussianType => Gaussian(param1.toInt, iteration * param2).mean
     case _: UniformType => Uniform(param1, iteration * param2).mean
     case _ => 0
