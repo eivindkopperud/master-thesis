@@ -1,6 +1,6 @@
 export ENV_VARIABLES_ARE_SET=whatever
-export SparkConfigurationMaster=spark://spark:7077
-export THRESHOLD=40
+#export SparkConfigurationMaster=spark://spark:7077
+export THRESHOLD=200
 export DATA_SOURCE=2
 export DISTRIBUTION_TYPE=2
 export DISTRIBUTION_PARAM1=1

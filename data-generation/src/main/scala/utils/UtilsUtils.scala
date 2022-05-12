@@ -27,8 +27,8 @@ object UtilsUtils {
   def loadDataSource(): DataSource = UtilsUtils.getConfigSafe("DATA_SOURCE") match {
     case Some(value) =>
       if (value.toInt == 1) return DataSource.Reptilian
-      if (value.toInt == 1) return DataSource.ContactsHyperText
-      if (value.toInt == 1) return DataSource.FbMessages
+      if (value.toInt == 2) return DataSource.ContactsHyperText
+      if (value.toInt == 3) return DataSource.FbMessages
       DataSource.Reptilian
     case None => DataSource.ContactsHyperText
   }

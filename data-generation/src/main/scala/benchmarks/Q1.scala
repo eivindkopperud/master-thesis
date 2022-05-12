@@ -19,6 +19,8 @@ class Q1(
     logger.warn(s"i $iteration: Generating logs")
     val logs = generateLogs(g)
 
+    logger.warn(s"i $iteration: Number of logs ${logs.count()}")
+
     logger.warn(s"i $iteration: Generating graphs")
     val landyGraph = Landy(logs)
     val snapshotDeltaGraph = SnapshotDelta(logs, Count(intervalDelta))
