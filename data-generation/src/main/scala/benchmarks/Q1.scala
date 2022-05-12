@@ -1,7 +1,7 @@
 package benchmarks
 
 import thesis.SnapshotIntervalType.Count
-import thesis.UpdateDistributions.{addGraphUpdateDistribution, generateLogs}
+import thesis.UpdateDistributions.loadOrGenerateLogs
 import thesis.{Interval, Landy, SnapshotDelta}
 import utils.TimeUtils.secondsToInstant
 
@@ -14,10 +14,8 @@ class Q1(
         ) extends ComparisonBenchmark(iterationCount, customColumn, benchmarkSuffixes) {
 
   override def execute(iteration: Int): Unit = {
-    logger.warn(s"i $iteration: Generating distribution")
-    val g = addGraphUpdateDistribution(graph, distribution(iteration))
-    logger.warn(s"i $iteration: Generating logs")
-    val logs = generateLogs(g)
+    logger.warn(s"i $iteration: Generating distribution and logs")
+    val logs = loadOrGenerateLogs(graph, distribution(iteration))
 
     val numberOfLogs = logs.count()
     logger.warn(s"i $iteration: Number of logs $numberOfLogs")
