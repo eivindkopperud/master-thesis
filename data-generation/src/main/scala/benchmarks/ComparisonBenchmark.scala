@@ -15,7 +15,7 @@ class ComparisonBenchmark(iterationCount: Int = 5,
   val dataSource = UtilsUtils.loadDataSource()
   val distributionType = UtilsUtils.loadDistributionType()
   val param1 = UtilsUtils.getConfig("DISTRIBUTION_PARAM1").toDouble
-  val param2 = UtilsUtils.getConfig("DISTRIBUTION_PARAM1").toDouble
+  val param2 = UtilsUtils.getConfig("DISTRIBUTION_PARAM2").toDouble
 
   val distribution = (iteration: Int) => distributionType match {
     case _: LogNormalType => LogNormalType(param1.toInt, iteration * param2)
