@@ -22,6 +22,17 @@ object TopologyGraphGenerator {
     case DataSource.ContactsHyperText => ("src/main/resources/ia-contacts_hypertext2009.csv", ",")
   }
 
+  def generateGraphBeforeMerge(dataSource: DataSource)(implicit spark: SparkSession): Graph[Int, Long] = {
+    val logger = LoggerFactory.getLogger("TopologyGraphGenerator")
+    val (filePath, delimiter) = getPathAndDelim(dataSource)
+    logger.warn(s"Generating unmerged graph from dataset $filePath")
+    val df = spark.read.option("delimiter", delimiter).csv(filePath)
+      .toDF("from", "to", "time")
+      .rdd
+      .map(r => Edge(r.getAs[String]("from").toLong, r.getAs[String]("to").toLong, r.getAs[String]("time").toLong))
+    Graph.fromEdges(df, 0)
+  }
+
   def generateGraph(
                      threshold: BigDecimal,
                      dataSource: DataSource = DataSource.Reptilian
@@ -57,5 +68,34 @@ object TopologyGraphGenerator {
     )
 
     Graph(vertices, edges)
+  }
+
+  def generateCsvThreshold(dataSource: DataSource)(implicit sparkSession: SparkSession): Unit = {
+    val numEdgesBeforeMerge = generateGraphBeforeMerge(dataSource).edges.count()
+    val pw = new java.io.PrintWriter(s"scaling-${dataSource.getClass.getSimpleName}.csv")
+    val header = "Threshold, Number of edges\n"
+    val s = s"0, $numEdgesBeforeMerge\n"
+    pw.write(header)
+    pw.write(s)
+    for (i <- 1 until 20) {
+      val numEdges = generateGraph(i, dataSource).edges.count()
+      pw.write(s"$i, $numEdges\n")
+    }
+    for (i <- 20 until 200 by 20) {
+      val numEdges = generateGraph(i, dataSource).edges.count()
+      pw.write(s"$i, $numEdges\n")
+    }
+    for (i <- 200 to 1000 by 100) {
+      val numEdges = generateGraph(i, dataSource).edges.count()
+      pw.write(s"$i, $numEdges\n")
+    }
+    pw.close()
+
+  }
+
+  def generateCsvOnHowEveryDataSourceScales()(implicit sc: SparkSession): Unit = {
+    generateCsvThreshold(DataSource.Reptilian)
+    generateCsvThreshold(DataSource.ContactsHyperText)
+    generateCsvThreshold(DataSource.FbMessages)
   }
 }
