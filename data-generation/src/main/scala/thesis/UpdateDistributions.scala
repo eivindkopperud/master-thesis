@@ -225,8 +225,8 @@ object UpdateDistributions {
    * @tparam VD Type of input graph
    * @return RDD[LogTSV] ready for further processing
    */
-  def loadOrGenerateLogs[VD: ClassTag](graph: Graph[VD, Interval], distributionType: DistributionType)(implicit sc: SparkContext): RDD[LogTSV] = {
-    val path = "previously_generated_logs/" + distributionType.toString.map(c => if (c == ',' || c == '(' || c == ')') 'S' else c) + ".data" // Should add datatype as well
+  def loadOrGenerateLogs[VD: ClassTag](graph: Graph[VD, Interval], distributionType: DistributionType, dataSource: DataSource)(implicit sc: SparkContext): RDD[LogTSV] = {
+    val path = "previously_generated_logs/" + dataSource.getClass.getSimpleName + "-" + distributionType.toString.map(c => if (c == ',' || c == '(' || c == ')') 'S' else c) + ".data" // Should add datatype as well
     if (Files.exists(Paths.get(path))) {
       getLogger.warn("Fetching from file")
       sc.objectFile[LogTSV](path)

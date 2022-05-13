@@ -14,7 +14,7 @@ class Q2(
 
   override def execute(iteration: Int): Unit = {
     logger.warn(s"i $iteration: Generating distribution and logs")
-    val logs = loadOrGenerateLogs(graph, distribution(iteration))
+    val logs = loadOrGenerateLogs(graph, distribution(iteration), dataSource)
 
     val numberOfLogs = logs.count().toString
     logger.warn(s"i $iteration: Number of logs $numberOfLogs")
