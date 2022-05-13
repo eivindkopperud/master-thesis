@@ -79,7 +79,7 @@ object UtilsUtils {
     val distributionType = UtilsUtils.loadDistributionType()
     val distribution = (iteration: Int) => distributionType match {
       case _: LogNormalType => LogNormalType(param1.toInt, iteration * param2)
-      case _: GaussianType => GaussianType(param1.toInt, iteration * param2)
+      case _: GaussianType => GaussianType(iteration * param1.toInt, param2)
       case _: UniformType => UniformType(param1, iteration * param2)
       case _: ZipfType => ZipfType(param1.toInt, iteration * param2)
     }
