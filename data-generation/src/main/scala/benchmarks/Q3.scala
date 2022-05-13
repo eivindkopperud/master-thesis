@@ -22,6 +22,7 @@ class Q3(
     val landyGraph = Landy(logs)
     val snapshotDeltaGraph = SnapshotDelta(logs, Count((numberOfLogs / 10).toInt))
 
+    val timestamp = logs.take((numberOfLogs / 20).toInt).last.timestamp
 
     // Warm up to ensure the first doesn't require more work.
     logger.warn(s"i $iteration: Running warmup")

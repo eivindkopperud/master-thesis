@@ -31,8 +31,6 @@ class ComparisonBenchmark(iterationCount: Int = 5,
     case _ => 0
   }
 
-  val timestamp = UtilsUtils.loadTimestamp()
-  val intervalDelta = UtilsUtils.loadIntervalDelta()
   val vertexId = UtilsUtils.loadVertexId()
 
   lazy val graph: Graph[Long, Interval] = {
