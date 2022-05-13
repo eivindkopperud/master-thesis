@@ -16,12 +16,12 @@ class Q2(
     logger.warn(s"i $iteration: Generating distribution and logs")
     val logs = loadOrGenerateLogs(graph, distribution(iteration), dataSource)
 
-    val numberOfLogs = logs.count().toString
+    val numberOfLogs = logs.count()
     logger.warn(s"i $iteration: Number of logs $numberOfLogs")
 
     logger.warn(s"i $iteration: Generating graphs")
     val landyGraph = Landy(logs)
-    val snapshotDeltaGraph = SnapshotDelta(logs, Count(intervalDelta))
+    val snapshotDeltaGraph = SnapshotDelta(logs, Count((numberOfLogs / 10).toInt))
 
     val expectedLogPrEntity = (iteration + 1).toString
 
@@ -36,7 +36,7 @@ class Q2(
       val g = landyGraph.snapshotAtTime(timestamp)
       g.graph.edges.collect()
       g.graph.vertices.collect()
-    }, customColumnValue = numberOfLogs)
+    }, customColumnValue = numberOfLogs.toString)
 
     logger.warn(s"i $iteration: Unpersisting, then running snapshotsdelta")
     unpersist()
@@ -44,7 +44,7 @@ class Q2(
       val g = snapshotDeltaGraph.snapshotAtTime(timestamp)
       g.graph.edges.collect()
       g.graph.vertices.collect()
-    }, customColumnValue = numberOfLogs)
+    }, customColumnValue = numberOfLogs.toString)
 
   }
 }

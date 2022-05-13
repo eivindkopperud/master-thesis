@@ -22,7 +22,7 @@ class Q1(
 
     logger.warn(s"i $iteration: Generating graphs")
     val landyGraph = Landy(logs)
-    val snapshotDeltaGraph = SnapshotDelta(logs, Count(intervalDelta))
+    val snapshotDeltaGraph = SnapshotDelta(logs, Count((numberOfLogs / 10).toInt))
 
     val interval = Interval(0, Instant.MAX)
 
