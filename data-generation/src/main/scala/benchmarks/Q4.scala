@@ -4,6 +4,7 @@ import thesis.SnapshotIntervalType.Count
 import thesis.UpdateDistributions.loadOrGenerateLogs
 import thesis.{Interval, Landy, SnapshotDelta}
 import utils.TimeUtils.secondsToInstant
+import utils.UtilsUtils.CollectTuple
 
 class Q4(
           iterationCount: Int = 5,
@@ -29,23 +30,15 @@ class Q4(
 
     // Warm up to ensure the first doesn't require more work.
     logger.warn(s"i $iteration: Running warmup")
-    landyGraph.activatedEntities(Interval(0, 0))
-    snapshotDeltaGraph.activatedEntities(Interval(0, 0))
+    landyGraph.activatedEntities(Interval(0, 0)).collect()
+    snapshotDeltaGraph.activatedEntities(Interval(0, 0)).collect()
 
     logger.warn(s"i $iteration: Unpersisting, then running landy")
     unpersist()
-    benchmarks(0).benchmarkAvg({
-      val (vertexIds, edgeIds) = landyGraph.activatedEntities(interval)
-      vertexIds.collect()
-      edgeIds.collect()
-    }, customColumnValue = numberOfLogs.toString)
+    benchmarks(0).benchmarkAvg(landyGraph.activatedEntities(interval).collect(), customColumnValue = numberOfLogs.toString)
 
     logger.warn(s"i $iteration: Unpersisting, then running snapshotsdelta")
     unpersist()
-    benchmarks(1).benchmarkAvg({
-      val (vertexIds, edgeIds) = snapshotDeltaGraph.activatedEntities(interval)
-      vertexIds.collect()
-      edgeIds.collect()
-    }, customColumnValue = numberOfLogs.toString)
+    benchmarks(1).benchmarkAvg(snapshotDeltaGraph.activatedEntities(interval).collect(), customColumnValue = numberOfLogs.toString)
   }
 }
