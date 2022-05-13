@@ -15,14 +15,13 @@ class Q3(
     logger.warn(s"i $iteration: Generating distribution and logs")
     val logs = loadOrGenerateLogs(graph, distribution(iteration), dataSource)
 
-    val numberOfLogs = logs.count().toString
+    val numberOfLogs = logs.count()
     logger.warn(s"i $iteration: Number of logs $numberOfLogs")
 
     logger.warn(s"i $iteration: Generating graphs")
     val landyGraph = Landy(logs)
-    val snapshotDeltaGraph = SnapshotDelta(logs, Count(intervalDelta))
+    val snapshotDeltaGraph = SnapshotDelta(logs, Count((numberOfLogs / 10).toInt))
 
-    val expectedLogPrEntity = (iteration + 1).toString
 
     // Warm up to ensure the first doesn't require more work.
     logger.warn(s"i $iteration: Running warmup")
@@ -31,10 +30,10 @@ class Q3(
 
     logger.warn(s"i $iteration: Unpersisting, then running landy")
     unpersist()
-    benchmarks(0).benchmarkAvg(landyGraph.getEntity(VERTEX(vertexId), timestamp), customColumnValue = numberOfLogs)
+    benchmarks(0).benchmarkAvg(landyGraph.getEntity(VERTEX(vertexId), timestamp), customColumnValue = numberOfLogs.toString)
 
     logger.warn(s"i $iteration: Unpersisting, then running snapshotsdelta")
     unpersist()
-    benchmarks(1).benchmarkAvg(snapshotDeltaGraph.getEntity(VERTEX(vertexId), timestamp), customColumnValue = numberOfLogs)
+    benchmarks(1).benchmarkAvg(snapshotDeltaGraph.getEntity(VERTEX(vertexId), timestamp), customColumnValue = numberOfLogs.toString)
   }
 }

@@ -5,8 +5,6 @@ import thesis.UpdateDistributions.loadOrGenerateLogs
 import thesis.{Interval, Landy, SnapshotDelta}
 import utils.TimeUtils.secondsToInstant
 
-import java.time.temporal.ChronoUnit
-
 class Q4(
           iterationCount: Int = 5,
           customColumn: String = "Number of logs",
@@ -17,18 +15,16 @@ class Q4(
     logger.warn(s"i $iteration: Generating distribution and logs")
     val logs = loadOrGenerateLogs(graph, distribution(iteration), dataSource)
 
-    val numberOfLogs = logs.count().toString
+    val numberOfLogs = logs.count()
     logger.warn(s"i $iteration: Number of logs $numberOfLogs")
 
     logger.warn(s"i $iteration: Generating graphs")
     val landyGraph = Landy(logs)
-    val snapshotDeltaGraph = SnapshotDelta(logs, Count(intervalDelta))
+    val snapshotDeltaGraph = SnapshotDelta(logs, Count((numberOfLogs / 10).toInt))
 
-    val expectedLogPrEntity = (iteration + 1).toString
     val min = logs.map(_.timestamp).takeOrdered(1).head
     val max = logs.map(_.timestamp).top(1).head
-    val diff = min.until(max, ChronoUnit.SECONDS)
-    val interval = Interval(min.getEpochSecond + (diff * 0.25).toLong, max.getEpochSecond - (diff * 0.25).toLong)
+    val interval = Interval(min, (max.getEpochSecond / 2))
     logger.warn(s"i $iteration $interval")
 
     // Warm up to ensure the first doesn't require more work.
@@ -42,7 +38,7 @@ class Q4(
       val (vertexIds, edgeIds) = landyGraph.activatedEntities(interval)
       vertexIds.collect()
       edgeIds.collect()
-    }, customColumnValue = numberOfLogs)
+    }, customColumnValue = numberOfLogs.toString)
 
     logger.warn(s"i $iteration: Unpersisting, then running snapshotsdelta")
     unpersist()
@@ -50,6 +46,6 @@ class Q4(
       val (vertexIds, edgeIds) = snapshotDeltaGraph.activatedEntities(interval)
       vertexIds.collect()
       edgeIds.collect()
-    }, customColumnValue = numberOfLogs)
+    }, customColumnValue = numberOfLogs.toString)
   }
 }
