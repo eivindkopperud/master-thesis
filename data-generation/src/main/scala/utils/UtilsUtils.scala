@@ -2,6 +2,7 @@ package utils
 
 import org.apache.spark.SparkContext
 import org.apache.spark.graphx.{Edge, VertexId}
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 import org.slf4j.{Logger, LoggerFactory}
 import thesis.DataTypes.{AttributeGraph, Attributes}
@@ -45,6 +46,13 @@ object UtilsUtils {
       Left((vertexIdAndDegrees(((length / 2) - 1)), vertexIdAndDegrees(length / 2)))
     } else {
       Right(vertexIdAndDegrees((length / 2).ceil.toInt))
+    }
+  }
+
+  implicit class CollectTuple[A, B](tuplesRdds: (RDD[A], RDD[B])) {
+    def collect(): (Array[A], Array[B]) = {
+      val (a, b) = tuplesRdds
+      (a.collect(), b.collect())
     }
   }
 
