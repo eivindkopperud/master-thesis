@@ -23,12 +23,12 @@ class Q2(
     val landyGraph = Landy(logs)
     val snapshotDeltaGraph = SnapshotDelta(logs, Count((numberOfLogs / 10).toInt))
 
-    val expectedLogPrEntity = (iteration + 1).toString
+    val timestamp = logs.take((numberOfLogs / 20).toInt).last.timestamp
 
     // Warm up to ensure the first doesn't require more work.
     logger.warn(s"i $iteration: Running warmup")
-    landyGraph.snapshotAtTime(0)
-    landyGraph.snapshotAtTime(0)
+    landyGraph.snapshotAtTime(0).graph.persist()
+    landyGraph.snapshotAtTime(0).graph.persist()
 
     logger.warn(s"i $iteration: Unpersisting, then running landy")
     unpersist()
