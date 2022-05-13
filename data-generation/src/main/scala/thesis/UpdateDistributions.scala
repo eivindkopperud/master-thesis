@@ -140,6 +140,7 @@ object UpdateDistributions {
   def uuid: Long = java.util.UUID.randomUUID.getLeastSignificantBits & Long.MaxValue
 
   def generateLogs(graph: Graph[Int, IntervalAndUpdateCount]): RDD[LogTSV] = {
+    getLogger.warn("Generating logs, this may take some time")
     val (vertices, edges) = (graph.vertices, graph.edges)
     val vertexIdWithTimestamp = vertices.map(vertex => {
       val (id, numberOfUpdates) = vertex
@@ -194,17 +195,21 @@ object UpdateDistributions {
     addEdgeUpdateDistribution(sc, g1, CorrelationMode.PositiveCorrelation, mode)
   }
 
-  def getLogs[VD: ClassTag](sc: SparkContext, graph: Graph[VD, Interval]): RDD[LogTSV] = {
+  def getLogs[VD: ClassTag](graph: Graph[VD, Interval], distributionType: DistributionType)(implicit scs: SparkContext): RDD[LogTSV] = {
     getLogger.warn("Generating updates")
-    val g = addGraphUpdateDistribution(graph)(implicitly, sc)
+    val g = addGraphUpdateDistribution(graph, distributionType)
     generateLogs(g)
   }
 
   def getLogger: Logger = LoggerFactory.getLogger("UpdateDistributionSpec")
 
-  def saveLogs(logs: RDD[LogTSV], path: String = "stored_logs"): RDD[LogTSV] = {
-    logs.saveAsObjectFile(path)
-    getLogger.warn(s"Saving logs to directory: $path")
+  def saveLogs(logs: RDD[LogTSV], path: String)(implicit sparkContext: SparkContext): RDD[LogTSV] = {
+    if (sparkContext.master.startsWith("local")) {
+      getLogger.warn(s"Saving logs to directory: $path")
+      logs.saveAsObjectFile(path)
+    } else {
+      getLogger.warn(s"RUNNING SPARK IN CLIENT MODE, CANT WRITE FILES THEN")
+    }
     logs
   }
 
@@ -220,12 +225,14 @@ object UpdateDistributions {
    * @tparam VD Type of input graph
    * @return RDD[LogTSV] ready for further processing
    */
-  def loadOrGenerateLogs[VD: ClassTag](sc: SparkContext, graph: Graph[VD, Interval], path: String = "stored_logs"): RDD[LogTSV] = {
+  def loadOrGenerateLogs[VD: ClassTag](graph: Graph[VD, Interval], distributionType: DistributionType, dataSource: DataSource)(implicit sc: SparkContext): RDD[LogTSV] = {
+    val path = "previously_generated_logs/" + dataSource.getClass.getSimpleName + "-" + distributionType.toString.map(c => if (c == ',' || c == '(' || c == ')') 'S' else c) + ".data" // Should add datatype as well
     if (Files.exists(Paths.get(path))) {
       getLogger.warn("Fetching from file")
       sc.objectFile[LogTSV](path)
     } else {
-      saveLogs(getLogs[VD](sc, graph))
+      getLogger.warn("No previous logs was found")
+      saveLogs(getLogs[VD](graph, distributionType), path)
     }
   }
 

@@ -2,6 +2,7 @@ package benchmarks
 
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.SparkSession
+import org.slf4j.{Logger, LoggerFactory}
 import thesis.SparkConfiguration.getSparkSession
 import utils.{Benchmark, FileWriter}
 
@@ -10,12 +11,18 @@ abstract class QueryBenchmark(val iterationCount: Int, val customColumn: String,
   implicit val sc: SparkContext = spark.sparkContext
   var benchmarks: Seq[Benchmark] = Seq()
 
+  val logger: Logger = LoggerFactory.getLogger(getClass.getSimpleName)
+
   def run: Unit = {
+    logger.warn("RUN STARTING")
     initialize
     for (i <- 1 to iterationCount) {
+      logger.warn(s"Iteration $i")
       execute(i)
     }
+    logger.warn("Running teardown")
     tearDown()
+    logger.warn("RUN FINISHED")
   }
 
   private def initialize: Unit = {
@@ -45,4 +52,6 @@ abstract class QueryBenchmark(val iterationCount: Int, val customColumn: String,
   def tearDown(): Unit = benchmarks.foreach(_.close())
 
   def unpersist(): Unit = sc.getPersistentRDDs.foreach(_._2.unpersist())
+
+
 }

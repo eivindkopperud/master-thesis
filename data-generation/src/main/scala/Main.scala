@@ -1,5 +1,10 @@
-import thesis.PossibleWorkFlow
+import benchmarks.{Q1, Q2, Q3, Q4}
 
 object Main extends App {
-  PossibleWorkFlow.run()
+  //getConfig("ENV_VARIABLES_ARE_SET") // Use this line if you want to make sure that env variabels are set
+  new Q1().run
+  new Q2().run
+  new Q3().run
+  new Q4().run
+
 }
