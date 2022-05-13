@@ -51,5 +51,6 @@ docker run -d \
     -e SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no \
     -e SPARK_SSL_ENABLED=no \
     -v "$(pwd)/data-generation:/opt/bitnami/spark/MASTER" \
+    -v "$(pwd)/benchmarks:/opt/bitnami/benchmarks" \
     bitnami/spark:$version \
 
