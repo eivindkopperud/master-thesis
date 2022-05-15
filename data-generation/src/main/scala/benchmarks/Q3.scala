@@ -32,7 +32,7 @@ class Q3(
 
     logger.warn(s"i $iteration: Unpersisting, then running landy")
     unpersist()
-    benchmarks(0).benchmarkAvg(landyGraph.getEntity(VERTEX(vertexId), timestamp), customColumnValue = numberOfLogs.toString)
+    benchmarks(0).benchmarkQ3(logs, vertexId, timestamp, customColumnValue = numberOfLogs.toString)
 
     logger.warn(s"i $iteration: Unpersisting, then running snapshotsdelta")
     unpersist()

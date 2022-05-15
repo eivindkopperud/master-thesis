@@ -1,5 +1,9 @@
 package utils
 
+import org.apache.spark.SparkContext
+import org.apache.spark.rdd.RDD
+import thesis.{Landy, LogTSV, VERTEX}
+
 import java.time.Instant
 import scala.collection.mutable
 import scala.concurrent.duration.NANOSECONDS
@@ -50,6 +54,24 @@ case class Benchmark(writer: Writer, inSeconds: Boolean = false, textPrefix: Str
     (1 to numberOfRuns) foreach (_ => {
       val start = System.nanoTime()
       function
+      val end = System.nanoTime()
+      timings += (end - start)
+    })
+    val avg: Double = timings.sum.toDouble / timings.length
+    val printString = if (inSeconds) {
+      s"$textPrefix,${NANOSECONDS.toSeconds(avg.round)},s,$numberOfRuns,$customColumnValue"
+    } else {
+      s"$textPrefix,${NANOSECONDS.toMillis(avg.round)},ms,$numberOfRuns,$customColumnValue"
+    }
+    writer.write(printString)
+  }
+
+  def benchmarkQ3(logs: RDD[LogTSV], vertexId: Long, timestamp: Instant, numberOfRuns: Int = 5, textPrefix: String = textPrefix, customColumnValue: String = "")(implicit sparkContext: SparkContext): Unit = {
+    val timings = mutable.MutableList[Long]()
+    (1 to numberOfRuns) foreach (_ => {
+      val landyGraph = Landy(logs)
+      val start = System.nanoTime()
+      landyGraph.getEntity(VERTEX(vertexId), timestamp)
       val end = System.nanoTime()
       timings += (end - start)
     })
