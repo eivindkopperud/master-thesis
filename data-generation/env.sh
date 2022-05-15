@@ -20,7 +20,8 @@ export DISTRIBUTION_PARAM2=0.4
 # 2 for Gaussian
 export TIMESTAMP=10
 export INTERVAL_DELTA=1000
-export VERTEX_ID=1
+export VERTEX_ID=56
+# 56 for Ia-hypercontacts
 
 export SparkDriverMemory=10g
 export SparkExecutorMemory=10g
