@@ -53,7 +53,7 @@ case class Benchmark(writer: Writer, inSeconds: Boolean = false, textPrefix: Str
       val end = System.nanoTime()
       timings += (end - start)
     })
-    val avg = timings.sum / timings.length.toFloat
+    val avg: Double = timings.sum.toDouble / timings.length
     val printString = if (inSeconds) {
       s"$textPrefix,${NANOSECONDS.toSeconds(avg.round)},s,$numberOfRuns,$customColumnValue"
     } else {
