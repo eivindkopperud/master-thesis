@@ -1,6 +1,5 @@
 package benchmarks
 
-import breeze.stats.distributions.{Gaussian, LogNormal, Uniform}
 import org.apache.spark.graphx.Graph
 import thesis.DistributionType.{GaussianType, LogNormalType, UniformType, ZipfType}
 import thesis.TopologyGraphGenerator.generateGraph
@@ -14,22 +13,14 @@ class ComparisonBenchmark(distributionType: DistributionType,
                          ) extends QueryBenchmark(iterationCount, customColumn, benchmarkSuffixes) {
   val threshold = UtilsUtils.loadThreshold()
   val dataSource = UtilsUtils.loadDataSource()
-  val param1 = UtilsUtils.getConfig("DISTRIBUTION_PARAM1").toDouble
-  val param2 = UtilsUtils.getConfig("DISTRIBUTION_PARAM2").toDouble
 
-  val distribution = (iteration: Int) => distributionType match {
-    case _: LogNormalType => LogNormalType(param1.toInt, iteration * param2)
-    case _: GaussianType => GaussianType(iteration * param1.toInt, param2)
-    case _: UniformType => UniformType(param1, iteration * param2)
-    case _: ZipfType => ZipfType(param1.toInt, iteration * param2)
+  val distribution: Int => DistributionType = (iteration: Int) => distributionType match {
+    case LogNormalType(param1, param2) => LogNormalType(param1, iteration * param2)
+    case GaussianType(param1, param2) => GaussianType(iteration * param1, param2)
+    case UniformType(param1, param2) => UniformType(param1, iteration * param2)
+    case ZipfType(param1, param2) => ZipfType(param1, iteration * param2)
   }
 
-  def getMean(iteration: Int): Double = distributionType match {
-    case _: LogNormalType => LogNormal(param1, iteration * param2).mean
-    case _: GaussianType => Gaussian(param1.toInt, iteration * param2).mean
-    case _: UniformType => Uniform(param1, iteration * param2).mean
-    case _ => 0
-  }
 
   val vertexId = UtilsUtils.loadVertexId()
 
