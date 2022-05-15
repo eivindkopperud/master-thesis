@@ -15,7 +15,7 @@ export DISTRIBUTION_PARAM1=1
 # 1 for LogNormal
 # 4 for Gaussian
 export DISTRIBUTION_PARAM2=0.4
-# 1 for Uniform
+# 8 for Uniform
 # 0.4 for LogNormal
 # 2 for Gaussian
 export TIMESTAMP=10

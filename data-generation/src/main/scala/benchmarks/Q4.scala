@@ -2,15 +2,16 @@ package benchmarks
 
 import thesis.SnapshotIntervalType.Count
 import thesis.UpdateDistributions.loadOrGenerateLogs
-import thesis.{Interval, Landy, SnapshotDelta}
+import thesis.{DistributionType, Interval, Landy, SnapshotDelta}
 import utils.TimeUtils.secondsToInstant
 import utils.UtilsUtils.CollectTuple
 
 class Q4(
+          distributionType: DistributionType,
           iterationCount: Int = 5,
           customColumn: String = "Number of logs",
           benchmarkSuffixes: Seq[String] = Seq("landy", "snapshot")
-        ) extends ComparisonBenchmark(iterationCount, customColumn, benchmarkSuffixes) {
+        ) extends ComparisonBenchmark(distributionType, iterationCount, customColumn, benchmarkSuffixes) {
 
   override def execute(iteration: Int): Unit = {
     logger.warn(s"i $iteration: Generating distribution and logs")
