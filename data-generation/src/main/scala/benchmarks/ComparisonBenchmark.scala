@@ -3,17 +3,17 @@ package benchmarks
 import breeze.stats.distributions.{Gaussian, LogNormal, Uniform}
 import org.apache.spark.graphx.Graph
 import thesis.DistributionType.{GaussianType, LogNormalType, UniformType, ZipfType}
-import thesis.Interval
 import thesis.TopologyGraphGenerator.generateGraph
+import thesis.{DistributionType, Interval}
 import utils.UtilsUtils
 
-class ComparisonBenchmark(iterationCount: Int = 5,
-                          customColumn: String = "average number of logs for each entity",
+class ComparisonBenchmark(distributionType: DistributionType,
+                          iterationCount: Int = 5,
+                          customColumn: String = "Number of logs",
                           benchmarkSuffixes: Seq[String] = Seq("landy", "snapshot")
                          ) extends QueryBenchmark(iterationCount, customColumn, benchmarkSuffixes) {
   val threshold = UtilsUtils.loadThreshold()
   val dataSource = UtilsUtils.loadDataSource()
-  val distributionType = UtilsUtils.loadDistributionType()
   val param1 = UtilsUtils.getConfig("DISTRIBUTION_PARAM1").toDouble
   val param2 = UtilsUtils.getConfig("DISTRIBUTION_PARAM2").toDouble
 
