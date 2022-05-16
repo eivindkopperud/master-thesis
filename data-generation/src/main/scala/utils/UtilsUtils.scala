@@ -95,32 +95,32 @@ object UtilsUtils {
     }
   }
 
-  def persistSomeDistributions() = {
+  def persistSomeDistributions(): Unit = {
     getConfig("ENV_VARIABLES_ARE_SET") // Use this line if you want to make sure that env variabels are set
     implicit val spark: SparkSession = getSparkSession
     implicit val sc: SparkContext = spark.sparkContext
 
     val logger: Logger = LoggerFactory.getLogger(getClass.getSimpleName)
 
-    val param1 = UtilsUtils.getConfig("DISTRIBUTION_PARAM1").toDouble
-    val param2 = UtilsUtils.getConfig("DISTRIBUTION_PARAM2").toDouble
-
-    val distributionType = UtilsUtils.loadDistributionType()
-    val distribution = (iteration: Int) => distributionType match {
-      case _: LogNormalType => LogNormalType(param1.toInt, iteration * param2)
-      case _: GaussianType => GaussianType(iteration * param1.toInt, param2)
-      case _: UniformType => UniformType(param1, iteration * param2)
-      case _: ZipfType => ZipfType(param1.toInt, iteration * param2)
+    val distribution = (iteration: Int, distributionType: DistributionType) => distributionType match {
+      case LogNormalType(param1, param2) => LogNormalType(param1, iteration * param2)
+      case GaussianType(param1, param2) => GaussianType(iteration * param1, param2)
+      case UniformType(param1, param2) => UniformType(param1, iteration * param2)
+      case ZipfType(param1, param2) => ZipfType(param1, iteration * param2)
     }
-    for (iteration <- 1 to 5) {
-      val graph = {
+    val graph = {
+      generateGraph(loadThreshold(), loadDataSource()).mapEdges(edge => {
+        val Interval(start, stop) = edge.attr
+        if (stop.isBefore(start)) Interval(stop, start) else Interval(start, stop)
+      })
+    }
+    val distributions = Seq(LogNormalType(1, 0.4), UniformType(1, 8), GaussianType(4, 2))
+    for (dist <- distributions) {
+      logger.warn(s" Distribution $dist ")
+      for (iteration <- 1 to 5) {
         logger.warn(s" Iteration $iteration ")
-        generateGraph(loadThreshold(), loadDataSource()).mapEdges(edge => {
-          val Interval(start, stop) = edge.attr
-          if (stop.isBefore(start)) Interval(stop, start) else Interval(start, stop)
-        })
+        loadOrGenerateLogs(graph, distribution(iteration, dist), loadDataSource())
       }
-      loadOrGenerateLogs(graph, distribution(iteration), loadDataSource())
     }
   }
 }
