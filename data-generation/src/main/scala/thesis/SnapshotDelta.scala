@@ -345,7 +345,10 @@ object SnapshotDelta {
         nextLog.copy(attributes = rightWayMergeHashMap(prevLog.attributes, nextLog.attributes)) // Could be either l1 or l2 that is copied
       case (CREATE, UPDATE) =>
         prevLog.copy(attributes = rightWayMergeHashMap(prevLog.attributes, nextLog.attributes))
-      case (prevLogState, nextLogState) => throw new IllegalStateException(s"($prevLogState,$nextLogState encountered when merging logs. The dataset is inconsistent \n Prev: $prevLog \n Next: $nextLog")
+      case (DELETE, UPDATE) if (prevLog.timestamp == nextLog.timestamp) => prevLog // This edge case does happen
+      case (prevLogState, nextLogState) =>
+        throw new IllegalStateException(s"($prevLogState,$nextLogState encountered when merging logs. The dataset is inconsistent \n Prev: $prevLog \n Next: $nextLog")
+
       // Cases that should not happen. We assume the LogTSVs are consistent and makes sense
       // example (DELETE, DELETE), (DELETE, UPDATE) // These do not make sense
     }

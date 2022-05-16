@@ -111,10 +111,11 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
 
   it should "throw exception when invalid state happens" in {
     val update = LogFactory().generateVertexTSV(1, 0)
+    val update2 = LogFactory().generateVertexTSV(2, 1)
     val create = update.copy(action = CREATE)
     val delete = update.copy(action = DELETE)
     a[IllegalStateException] should be thrownBy {
-      mergeLogTSV(delete, update)
+      mergeLogTSV(delete, update2)
     }
     a[IllegalStateException] should be thrownBy {
       mergeLogTSV(delete, create)
@@ -125,6 +126,11 @@ class SnapshotDeltaSpec extends AnyFlatSpec with SparkTestWrapper {
     a[IllegalStateException] should be thrownBy {
       mergeLogTSV(delete, delete)
     }
+  }
+  it should "not throw exception if the timestamps are equal" in {
+    val update = LogFactory().generateVertexTSV(1, 0)
+    val delete = update.copy(action = DELETE, attributes = HashMap())
+    assert(mergeLogTSV(delete, update) == delete)
   }
 
   "SnapshotAtTime" should "return correct graph given a timestamp close to a snapshot in the past" in {
