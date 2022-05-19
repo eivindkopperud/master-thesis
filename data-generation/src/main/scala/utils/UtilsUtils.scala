@@ -10,7 +10,7 @@ import thesis.DistributionType.{GaussianType, LogNormalType, UniformType, ZipfTy
 import thesis.SparkConfiguration.getSparkSession
 import thesis.TopologyGraphGenerator.generateGraph
 import thesis.UpdateDistributions.loadOrGenerateLogs
-import thesis.{DataSource, DistributionType, Interval, SnapshotEdgePayload}
+import thesis.{CorrelationMode, DataSource, DistributionType, Interval, SnapshotEdgePayload}
 
 object UtilsUtils {
   def uuid: Long = java.util.UUID.randomUUID.getLeastSignificantBits & Long.MaxValue
@@ -114,12 +114,13 @@ object UtilsUtils {
         if (stop.isBefore(start)) Interval(stop, start) else Interval(start, stop)
       })
     }
-    val distributions = Seq(LogNormalType(1, 0.4), UniformType(1, 8), GaussianType(4, 2))
-    for (dist <- distributions) {
-      logger.warn(s" Distribution $dist ")
+    //val distributions = Seq(LogNormalType(1, 0.4), UniformType(1, 8), GaussianType(4, 2))
+    val correlationModes = Seq(CorrelationMode.NegativeCorrelation, CorrelationMode.Uniform)
+    for (corrMode <- correlationModes) {
+      logger.warn(s" Correlation mode $corrMode ")
       for (iteration <- 1 to 5) {
         logger.warn(s" Iteration $iteration ")
-        loadOrGenerateLogs(graph, distribution(iteration, dist), loadDataSource())
+        loadOrGenerateLogs(graph, distribution(iteration, LogNormalType(1, 0.4)), loadDataSource(), correlationMode = corrMode)
       }
     }
   }

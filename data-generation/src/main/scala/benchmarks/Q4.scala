@@ -2,12 +2,13 @@ package benchmarks
 
 import thesis.SnapshotIntervalType.Count
 import thesis.UpdateDistributions.loadOrGenerateLogs
-import thesis.{DistributionType, Interval, Landy, SnapshotDelta}
+import thesis.{CorrelationMode, DistributionType, Interval, Landy, SnapshotDelta}
 import utils.TimeUtils.secondsToInstant
 import utils.UtilsUtils.CollectTuple
 
 class Q4(
           distributionType: DistributionType,
+          correlationMode: CorrelationMode = CorrelationMode.PositiveCorrelation,
           iterationCount: Int = 5,
           customColumn: String = "Number of logs",
           benchmarkSuffixes: Seq[String] = Seq("landy", "snapshot")
@@ -15,7 +16,7 @@ class Q4(
 
   override def execute(iteration: Int): Unit = {
     logger.warn(s"i $iteration: Generating distribution and logs")
-    val logs = loadOrGenerateLogs(graph, distribution(iteration), dataSource)
+    val logs = loadOrGenerateLogs(graph, distribution(iteration), dataSource, correlationMode = correlationMode)
 
     val numberOfLogs = logs.count()
     logger.warn(s"i $iteration: Number of logs $numberOfLogs")
