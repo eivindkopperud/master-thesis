@@ -189,9 +189,9 @@ object UpdateDistributions {
     addEdgeUpdateDistribution(sc, g1, CorrelationMode.PositiveCorrelation, LogNormalType(mu, sigma))
   }
 
-  def addGraphUpdateDistribution[VD: ClassTag](graph: Graph[VD, Interval], mode: DistributionType = UniformType(0, 10))(implicit sc: SparkContext): Graph[Int, IntervalAndUpdateCount] = {
+  def addGraphUpdateDistribution[VD: ClassTag](graph: Graph[VD, Interval], mode: DistributionType = UniformType(0, 10), correlationMode: CorrelationMode = CorrelationMode.PositiveCorrelation)(implicit sc: SparkContext): Graph[Int, IntervalAndUpdateCount] = {
     getLogger.warn(s"Adding updates with distribution type:$mode")
-    val g1 = addVertexUpdateDistribution(sc, graph, CorrelationMode.PositiveCorrelation, mode)
+    val g1 = addVertexUpdateDistribution(sc, graph, correlationMode, mode)
     addEdgeUpdateDistribution(sc, g1, CorrelationMode.PositiveCorrelation, mode)
   }
 
@@ -225,13 +225,23 @@ object UpdateDistributions {
    * @tparam VD Type of input graph
    * @return RDD[LogTSV] ready for further processing
    */
-  def loadOrGenerateLogs[VD: ClassTag](graph: Graph[VD, Interval], distributionType: DistributionType, dataSource: DataSource)(implicit sc: SparkContext): RDD[LogTSV] = {
-    val path = "previously_generated_logs/" + dataSource.getClass.getSimpleName + "-" + distributionType.toString.map(c => if (c == ',' || c == '(' || c == ')') 'S' else c) + ".data" // Should add datatype as well
+  def loadOrGenerateLogs[VD: ClassTag](graph: Graph[VD, Interval],
+                                       distributionType: DistributionType,
+                                       dataSource: DataSource,
+                                       correlationMode: CorrelationMode = CorrelationMode.PositiveCorrelation)
+                                      (implicit sc: SparkContext): RDD[LogTSV] = {
+    val initPath = "previously_generated_logs/" + dataSource.getClass.getSimpleName + "-" + distributionType.toString.map(c => if (c == ',' || c == '(' || c == ')') 'S' else c) + ".data" // Should add datatype as well
+    val extraSuffix = correlationMode match {
+      case CorrelationMode.Uniform => ".uniform"
+      case CorrelationMode.PositiveCorrelation => ""
+      case CorrelationMode.NegativeCorrelation => "negativecorrelation"
+    }
+    val path = initPath + extraSuffix
     if (Files.exists(Paths.get(path))) {
-      getLogger.warn("Fetching from file")
+      getLogger.warn(s"Fetching from file: $path")
       sc.objectFile[LogTSV](path)
     } else {
-      getLogger.warn("No previous logs was found")
+      getLogger.warn(s"No previous logs was found with path: $path")
       saveLogs(getLogs[VD](graph, distributionType), path)
     }
   }
