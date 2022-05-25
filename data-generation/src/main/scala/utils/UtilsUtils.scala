@@ -1,7 +1,7 @@
 package utils
 
 import org.apache.spark.SparkContext
-import org.apache.spark.graphx.{Edge, VertexId}
+import org.apache.spark.graphx.{Edge, Graph, VertexId}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 import org.slf4j.{Logger, LoggerFactory}
@@ -53,6 +53,13 @@ object UtilsUtils {
     def collect(): (Array[A], Array[B]) = {
       val (a, b) = tuplesRdds
       (a.collect(), b.collect())
+    }
+  }
+
+  implicit class PersistGraph[V, E](graph: Graph[V, E]) {
+    def saveAsObjectFiles(path: String): Unit = {
+      graph.vertices.saveAsObjectFile("storage/V_" + path)
+      graph.edges.saveAsObjectFile("storage/E_" + path)
     }
   }
 
