@@ -38,7 +38,7 @@ class Q1DegreeBenchmark extends QueryBenchmark(iterationCount = 20, customColumn
 
   override def execute(iteration: Int): Unit = {
     // Warm up to ensure the first doesn't require more work.
-    val vertexId = vertexIds(iteration / iterationCount * vertexIds.size)._1
+    val vertexId = vertexIds(iteration / iterationCount * (vertexIds.size-1))._1
     logger.warn(s"i $iteration: Running warmup")
     landyGraph.directNeighbours(0, interval).collect()
     snapshotDeltaGraph.directNeighbours(0, interval).collect()
