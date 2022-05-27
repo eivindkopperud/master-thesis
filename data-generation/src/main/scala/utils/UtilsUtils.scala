@@ -28,8 +28,8 @@ object UtilsUtils {
     case None => 40
   }
 
-  def numberOfNeighboursPrNode()(implicit sparkContext: SparkSession) = {
-    val edges = generateGraph(loadThreshold(), loadDataSource()).mapEdges(edge => {
+  def getNumberOfNeighboursPrNode[VD, ED](graph: Graph[VD, ED])(implicit sparkContext: SparkSession) = {
+    val edges = graph.mapEdges(edge => {
       val Interval(start, stop) = edge.attr
       if (stop.isBefore(start)) Interval(stop, start) else Interval(start, stop)
     }).edges
@@ -38,14 +38,16 @@ object UtilsUtils {
     val bothEdges = outEdges.join(inEdges)
       .map(vertexAndTup => (vertexAndTup._1, vertexAndTup._2._1 + vertexAndTup._2._2)).sortBy(_._2)
 
-    val vertexIdAndDegrees = bothEdges.collect()
-    println(vertexIdAndDegrees.mkString("Array(", ", ", ")"))
-    val length = vertexIdAndDegrees.length
+    bothEdges.collect()
+  }
+
+  def getNeighbourMedian(verticesWithIdAndDegree: Array[(VertexId, Int)]) = {
+    val length = verticesWithIdAndDegree.length
     val isEven = length % 2 == 0
     if (isEven) {
-      Left((vertexIdAndDegrees(((length / 2) - 1)), vertexIdAndDegrees(length / 2)))
+      Left((verticesWithIdAndDegree(((length / 2) - 1)), verticesWithIdAndDegree(length / 2)))
     } else {
-      Right(vertexIdAndDegrees((length / 2).ceil.toInt))
+      Right(verticesWithIdAndDegree((length / 2).ceil.toInt))
     }
   }
 
