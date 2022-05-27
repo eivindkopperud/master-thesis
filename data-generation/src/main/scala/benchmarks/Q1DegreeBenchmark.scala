@@ -38,18 +38,18 @@ class Q1DegreeBenchmark extends QueryBenchmark(iterationCount = 20, customColumn
 
   override def execute(iteration: Int): Unit = {
     // Warm up to ensure the first doesn't require more work.
-    val vertexId = vertexIds(iteration / iterationCount * (vertexIds.size-1))._1
+    val vertex = vertexIds((iteration.toDouble / iterationCount.toDouble * (vertexIds.size-1)).toInt)
     logger.warn(s"i $iteration: Running warmup")
     landyGraph.directNeighbours(0, interval).collect()
     snapshotDeltaGraph.directNeighbours(0, interval).collect()
 
     logger.warn(s"i $iteration: Unpersisting, then running landy")
     unpersist()
-    benchmarks(0).benchmarkAvg(landyGraph.directNeighbours(vertexId, interval).collect(), customColumnValue = vertexId.toString)
+    benchmarks(0).benchmarkAvg(landyGraph.directNeighbours(vertex._1, interval).collect(), customColumnValue = vertex._2.toString)
 
     logger.warn(s"i $iteration: Unpersisting, then running snapshotsdelta")
     unpersist()
-    benchmarks(1).benchmarkAvg(snapshotDeltaGraph.directNeighbours(vertexId, interval).collect(), customColumnValue = vertexId.toString)
+    benchmarks(1).benchmarkAvg(snapshotDeltaGraph.directNeighbours(vertex._1, interval).collect(), customColumnValue = vertex._2.toString)
   }
 
 }
