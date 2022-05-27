@@ -31,14 +31,16 @@ class Q1DegreeBenchmark extends QueryBenchmark(iterationCount = 20, customColumn
     })
   }
   val logs = loadOrGenerateLogs(graph, distributionType, loadDataSource(), correlationMode = PositiveCorrelation)
-  val landyGraph = Landy(logs)
-  val snapshotDeltaGraph = SnapshotDelta(logs, Count((logs.count() / 10).toInt))
+
   val interval = Interval(Instant.MIN, Instant.MAX)
   val vertexIds = UtilsUtils.getNumberOfNeighboursPrNode(graph)
 
   override def execute(iteration: Int): Unit = {
+    val landyGraph = Landy(logs)
+    val snapshotDeltaGraph = SnapshotDelta(logs, Count((logs.count() / 10).toInt))
+
+    val vertex = vertexIds(((iterationCount - iteration.toDouble) / iterationCount.toDouble * (vertexIds.size - 1)).toInt)
     // Warm up to ensure the first doesn't require more work.
-    val vertex = vertexIds(((iterationCount - iteration.toDouble) / iterationCount.toDouble * (vertexIds.size-1)).toInt)
     logger.warn(s"i $iteration: Running warmup")
     landyGraph.directNeighbours(0, interval).collect()
     snapshotDeltaGraph.directNeighbours(0, interval).collect()
