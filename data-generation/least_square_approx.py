@@ -11,6 +11,16 @@ for root, dirs, files in os.walk(pwd + path):
     for file in files:
         list_of_files.append(os.path.join(root,file))
 
+
+Q1 = []
+Q2 = []
+Q3 = []
+Q4 = []
+
+LN = []
+UN = []
+dists = [LN,UN]
+list_of_qs = [Q1,Q2,Q3,Q4]
 list_of_stigningstall = []
 def calcStuff(filepath):
     f = open(filepath, "r")
@@ -25,14 +35,19 @@ def calcStuff(filepath):
     # Usikker på hva denne gjør, men den gjør at den funker
     A = np.vstack([x,np.ones(len(x))]).T
 
-    m, c = np.linalg.lstsq(A,y, rcond=None)[0]
+    m, _ = np.linalg.lstsq(A,y, rcond=None)[0]
 
     #print(f"{argv[1]}: ({m=}, {c=})")
-    print(m)
-    list_of_stigningstall.append(m)
+#    print(m)
+    if "LogNormal" in file:
+        LN.append(m)
+    if "Uniform" in file:
+        UN.append(m)
     f.close()
 
+list_of_files.sort()
 for file in list_of_files:
     calcStuff(file)
 
-print(f"Mean: {mean(list_of_stigningstall)}, Variance {variance(list_of_stigningstall)}")
+print(dists)
+
