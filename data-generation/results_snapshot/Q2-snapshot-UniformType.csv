@@ -1,0 +1,6 @@
+function,value,timeunit,number of runs,Number of logs
+Q2-snapshot-UniformType,460,ms,5,49668
+Q2-snapshot-UniformType,756,ms,5,83591
+Q2-snapshot-UniformType,956,ms,5,115538
+Q2-snapshot-UniformType,1390,ms,5,148223
+Q2-snapshot-UniformType,1539,ms,5,181965
