@@ -6,7 +6,7 @@ import thesis.SnapshotIntervalType.Count
 import thesis.SparkConfiguration.getSparkSession
 import thesis.TopologyGraphGenerator.generateGraph
 import thesis.UpdateDistributions.loadOrGenerateLogs
-import thesis.{DataSource, Interval, Landy, SnapshotDelta}
+import thesis.{DataSource, Interval, SnapshotDelta, Validity}
 import utils.UtilsUtils.PersistGraph
 
 
@@ -27,7 +27,7 @@ object StorageComparison {
   def run(): Unit = {
     val logs = loadOrGenerateLogs(graph, LogNormalType(1, 0.4), datasource)
     val numberOfLogs = logs.count()
-    val landyGraph = Landy(logs)
+    val landyGraph = Validity(logs)
     val snapshotDeltaGraph10 = SnapshotDelta(logs, Count((numberOfLogs / 10).toInt))
     val snapshotDeltaGraph100 = SnapshotDelta(logs, Count((numberOfLogs / 100).toInt))
     landyGraph.underlyingGraph.saveAsObjectFiles("landy.data")

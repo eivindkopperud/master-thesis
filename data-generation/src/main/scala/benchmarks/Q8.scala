@@ -5,7 +5,7 @@ import thesis.DistributionType.LogNormalType
 import thesis.SnapshotIntervalType.Count
 import thesis.TopologyGraphGenerator.generateGraph
 import thesis.UpdateDistributions.loadOrGenerateLogs
-import thesis.{DataSource, Interval, Landy, SnapshotDelta}
+import thesis.{DataSource, Interval, SnapshotDelta, Validity}
 import utils.UtilsUtils.CollectTuple
 
 class Q8(
@@ -23,7 +23,7 @@ class Q8(
   val dataSource = DataSource.ContactsHyperText
   val logs = loadOrGenerateLogs(graph, LogNormalType(1, 0.8), dataSource)
 
-  val landyGraph = Landy(logs)
+  val landyGraph = Validity(logs)
   val snapshotDeltaGraph = SnapshotDelta(logs, Count(1000))
 
   val logTimestamps = logs.map(_.timestamp).collect()

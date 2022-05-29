@@ -4,16 +4,16 @@ import org.apache.spark.graphx.Graph
 import org.scalatest.Outcome
 import org.scalatest.flatspec.FixtureAnyFlatSpec
 import thesis.SnapshotIntervalType.Time
-import thesis.{EDGE, Entity, Interval, Landy, LogTSV, SnapshotDelta, VERTEX}
+import thesis.{EDGE, Entity, Interval, LogTSV, SnapshotDelta, VERTEX, Validity}
 import utils.LogUtils.seqToRdd
 import utils.TimeUtils.secondsToInstant
 import wrappers.SparkTestWrapper
 
-class SnapshotLandySpec extends FixtureAnyFlatSpec with SparkTestWrapper {
+class SnapshotValiditySpec extends FixtureAnyFlatSpec with SparkTestWrapper {
 
   case class FixtureParam(factory: LogFactory,
                           entities: Seq[Entity],
-                          landyGraph: Landy,
+                          landyGraph: Validity,
                           snapshotDelta: SnapshotDelta,
                           logs: Seq[LogTSV])
 
@@ -31,7 +31,7 @@ class SnapshotLandySpec extends FixtureAnyFlatSpec with SparkTestWrapper {
     val logs2 = offsetEntities
       .flatMap(offsetFactory.buildSingleSequenceWithDelete(_))
     val logs = (logs1 ++ logs2).sortBy(_.timestamp)
-    val landyGraph = Landy(logs)
+    val landyGraph = Validity(logs)
     val snapshotDeltaGraph = SnapshotDelta(logs, Time(100))
     withFixture(test.toNoArgTest(FixtureParam(
       factory, entities, landyGraph, snapshotDeltaGraph, logs

@@ -1,5 +1,6 @@
 export ENV_VARIABLES_ARE_SET=whatever
-export SparkConfigurationMaster=spark://spark:7077
+export SparkConfigurationMaster=local[2]
+#export SparkConfigurationMaster=spark://spark:7077
 # = local[*] //Prod when writing to files
 # = local[2] // Locally
 export THRESHOLD=40

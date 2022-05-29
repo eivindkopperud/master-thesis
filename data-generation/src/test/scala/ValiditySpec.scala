@@ -1,8 +1,8 @@
-import factories.LandyGraphFactory.createGraph
 import factories.LogFactory
+import factories.ValidityGraphFactory.createGraph
 import org.apache.spark.SparkContext
 import org.scalatest.flatspec.AnyFlatSpec
-import thesis.{EDGE, Interval, Landy, Snapshot, VERTEX}
+import thesis.{EDGE, Interval, Snapshot, VERTEX, Validity}
 import utils.TimeUtils
 import utils.TimeUtils.{t1, t2, t3, t4}
 import wrappers.SparkTestWrapper
@@ -10,17 +10,17 @@ import wrappers.SparkTestWrapper
 import java.time.Instant
 
 
-class LandySpec extends AnyFlatSpec with SparkTestWrapper {
+class ValiditySpec extends AnyFlatSpec with SparkTestWrapper {
 
   "Landy" can "be created" in {
-    val landy: Landy = new Landy(createGraph())
+    val landy: Validity = new Validity(createGraph())
 
     assert(landy.underlyingGraph.vertices.count() == 5)
     assert(landy.underlyingGraph.edges.count() == 2)
   }
 
   it can "give a snapshot" in {
-    val landy: Landy = new Landy(createGraph())
+    val landy: Validity = new Validity(createGraph())
 
     val Snapshot(graph, _) = landy.snapshotAtTime(t2)
 
@@ -39,7 +39,7 @@ class LandySpec extends AnyFlatSpec with SparkTestWrapper {
     val edgeLogs = LogFactory(startTime = timestamps(4), endTime = timestamps(8)).buildSingleSequence(EDGE(1, 1, 2))
     val logs = (vertexLogs1 ++ vertexLogs2 ++ edgeLogs).sortBy(_.timestamp)
     val logRDD = sparkContext.parallelize(logs)
-    val g = Landy(logRDD)
+    val g = Validity(logRDD)
 
     val intervalWithVertex1 = g.activatedEntities(Interval(timestamps.head, timestamps(3)))
     val intervalWithVertex2 = g.activatedEntities(Interval(timestamps(5), timestamps(7)))
@@ -62,7 +62,7 @@ class LandySpec extends AnyFlatSpec with SparkTestWrapper {
 
   it can "query direct neighbours" in {
     implicit val sparkContext: SparkContext = spark.sparkContext
-    val g = new Landy(createGraph())
+    val g = new Validity(createGraph())
 
     // Assertions for 1L's neighbours through time
     assert(g.directNeighbours(1L, Interval(t3, t3)).collect().toSeq == Seq(2L))
@@ -74,7 +74,7 @@ class LandySpec extends AnyFlatSpec with SparkTestWrapper {
   }
 
   it can "query for vertex edges" in {
-    val graph = new Landy(createGraph())
+    val graph = new Validity(createGraph())
 
     assert(graph.getEntity(VERTEX(1L), t1).get._2("color") == "red")
     // assert(graph.getEntity(VERTEX(1L), t2).get._2("color") == "orange") currently fails due to overlapping values in t2

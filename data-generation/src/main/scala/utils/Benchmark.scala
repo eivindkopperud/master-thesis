@@ -2,7 +2,7 @@ package utils
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import thesis.{Landy, LogTSV, VERTEX}
+import thesis.{LogTSV, VERTEX, Validity}
 
 import java.time.Instant
 import scala.collection.mutable
@@ -69,7 +69,7 @@ case class Benchmark(writer: Writer, inSeconds: Boolean = false, textPrefix: Str
   def benchmarkQ3(logs: RDD[LogTSV], vertexId: Long, timestamp: Instant, numberOfRuns: Int = 5, textPrefix: String = textPrefix, customColumnValue: String = "")(implicit sparkContext: SparkContext): Unit = {
     val timings = mutable.MutableList[Long]()
     (1 to numberOfRuns) foreach (_ => {
-      val landyGraph = Landy(logs)
+      val landyGraph = Validity(logs)
       val start = System.nanoTime()
       landyGraph.getEntity(VERTEX(vertexId), timestamp)
       val end = System.nanoTime()
