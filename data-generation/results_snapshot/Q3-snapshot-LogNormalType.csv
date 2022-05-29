@@ -1,0 +1,6 @@
+function,value,timeunit,number of runs,number of logs
+Q3-snapshot-LogNormalType,136,ms,5,36784
+Q3-snapshot-LogNormalType,152,ms,5,43455
+Q3-snapshot-LogNormalType,184,ms,5,58691
+Q3-snapshot-LogNormalType,251,ms,5,92120
+Q3-snapshot-LogNormalType,436,ms,5,169477

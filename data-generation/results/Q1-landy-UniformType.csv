@@ -1,0 +1,6 @@
+function,value,timeunit,number of runs,Number of logs
+Q1-landy-UniformType,461,ms,5,49668
+Q1-landy-UniformType,891,ms,5,83591
+Q1-landy-UniformType,1143,ms,5,115538
+Q1-landy-UniformType,1781,ms,5,148223
+Q1-landy-UniformType,1892,ms,5,181965
