@@ -51,7 +51,7 @@ abstract class QueryBenchmark(val iterationCount: Int, val customColumn: String,
 
   def tearDown(): Unit = benchmarks.foreach(_.close())
 
-  def unpersist(): Unit = sc.getPersistentRDDs.foreach(_._2.unpersist())
+  def unpersist(): Unit = sc.getPersistentRDDs.foreach(_._2.unpersist(blocking = true))
 
 
 }
