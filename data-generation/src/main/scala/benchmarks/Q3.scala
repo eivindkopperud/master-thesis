@@ -2,7 +2,7 @@ package benchmarks
 
 import thesis.SnapshotIntervalType.Count
 import thesis.UpdateDistributions.loadOrGenerateLogs
-import thesis.{CorrelationMode, DistributionType, Landy, SnapshotDelta, VERTEX}
+import thesis.{CorrelationMode, DistributionType, SnapshotDelta, VERTEX, Validity}
 import utils.TimeUtils.secondsToInstant
 
 class Q3(
@@ -21,7 +21,7 @@ class Q3(
     logger.warn(s"i $iteration: Number of logs $numberOfLogs")
 
     logger.warn(s"i $iteration: Generating graphs")
-    val landyGraph = Landy(logs)
+    val landyGraph = Validity(logs)
     val snapshotDeltaGraph = SnapshotDelta(logs, Count((numberOfLogs / 10).toInt))
 
     val timestamp = logs.take((numberOfLogs / 20).toInt).last.timestamp

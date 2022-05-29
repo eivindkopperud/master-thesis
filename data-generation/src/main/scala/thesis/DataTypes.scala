@@ -9,7 +9,7 @@ import scala.math.Ordered.orderingToOrdered
 
 object DataTypes {
   type AttributeGraph = Graph[Attributes, SnapshotEdgePayload]
-  type LandyAttributeGraph = Graph[LandyEntityPayload, LandyEntityPayload]
+  type ValidityAttributeGraph = Graph[ValidityEntityPayload, ValidityEntityPayload]
   type Attributes = immutable.HashMap[String, String]
   type EdgeId = Long
 }
@@ -45,7 +45,7 @@ object SnapshotIntervalType {
 
 final case class Snapshot(graph: AttributeGraph, instant: Instant)
 
-case class LandyEntityPayload(id: Long, validFrom: Instant, validTo: Instant, attributes: Attributes) {
+case class ValidityEntityPayload(id: Long, validFrom: Instant, validTo: Instant, attributes: Attributes) {
   def interval: Interval = {
     Interval(validFrom, validTo)
   }
