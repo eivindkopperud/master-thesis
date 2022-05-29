@@ -7,7 +7,7 @@ import thesis.CorrelationMode.PositiveCorrelation
 import thesis.DistributionType.{GaussianType, LogNormalType, UniformType, ZipfType}
 import thesis.SnapshotIntervalType.Count
 import thesis.TopologyGraphGenerator.generateGraph
-import thesis.{Interval, Landy, SnapshotDelta}
+import thesis.{Interval, Validity, SnapshotDelta}
 import thesis.UpdateDistributions.loadOrGenerateLogs
 import utils.UtilsUtils
 import utils.UtilsUtils.{loadDataSource, loadDistributionType, loadThreshold}
@@ -36,7 +36,7 @@ class Q1DegreeBenchmark extends QueryBenchmark(iterationCount = 20, customColumn
   val vertexIds = UtilsUtils.getNumberOfNeighboursPrNode(graph)
 
   override def execute(iteration: Int): Unit = {
-    val landyGraph = Landy(logs)
+    val landyGraph = Validity(logs)
     val snapshotDeltaGraph = SnapshotDelta(logs, Count((logs.count() / 10).toInt))
 
     val vertex = vertexIds((iteration.toDouble / iterationCount.toDouble * (vertexIds.size - 1)).toInt)
