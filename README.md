@@ -3,7 +3,7 @@
   <br>
   <img src="https://github.com/eivindkopperud/master-thesis/actions/workflows/test.yml/badge.svg" alt="Scala test status")>
   <br>
-  <em> A GraphX extension for processing temporal data with two implemented models </em>
+  <em> A GraphX extension for processing temporal data with two implemented models  </em>
 </p>
 
 
