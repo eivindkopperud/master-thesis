@@ -33,6 +33,7 @@ def calcStuff(filepath):
         y.append(int(s[1]))
 
     # Usikker på hva denne gjør, men den gjør at den funker
+    y = [num / max(y) for num in y]
     A = np.vstack([x,np.ones(len(x))]).T
 
     m, _ = np.linalg.lstsq(A,y, rcond=None)[0]
