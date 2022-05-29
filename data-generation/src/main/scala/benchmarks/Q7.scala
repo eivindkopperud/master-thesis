@@ -1,15 +1,11 @@
 package benchmarks
 
 import org.apache.spark.graphx.Graph
-import thesis.DataSource.ContactsHyperText
-import thesis.DistributionType.{LogNormalType, UniformType}
+import thesis.DistributionType.LogNormalType
 import thesis.SnapshotIntervalType.Count
 import thesis.TopologyGraphGenerator.generateGraph
 import thesis.UpdateDistributions.{addGraphUpdateDistribution, generateLogs}
-import thesis.{DataSource, Interval, Landy, SnapshotDelta}
-import utils.TimeUtils.secondsToInstant
-
-import java.time.Instant
+import thesis.{DataSource, Interval, SnapshotDelta, Validity}
 
 class Q7(
           iterationCount: Int = 21,
@@ -19,7 +15,7 @@ class Q7(
   val g = addGraphUpdateDistribution(graph, LogNormalType(1, 0.8))
   val logs = generateLogs(g)
 
-  val landyGraph = Landy(logs)
+  val landyGraph = Validity(logs)
   val snapshotDeltaGraph = SnapshotDelta(logs, Count(1000))
 
   val logTimestamps = logs.map(_.timestamp).collect()

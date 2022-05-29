@@ -49,7 +49,7 @@ object PossibleWorkFlow {
     println(s"Number of vertices in the first snapshot ${snapshotModel.graphs.head.graph.vertices.count()}")
     println(s"Number of logs ${logs.count()}")
 
-    val landyModel = Landy(logs)
+    val landyModel = Validity(logs)
     //TODO benchmark queries
     val graphAtTime = snapshotModel.snapshotAtTime(2012)
     println(s"Graph at time 2012 has ${graphAtTime.graph.vertices.count()} vertices and ${graphAtTime.graph.edges.count()} edges")

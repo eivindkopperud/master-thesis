@@ -2,16 +2,15 @@ package factories
 
 import org.apache.spark.graphx.{Edge, Graph, VertexId}
 import org.apache.spark.sql.SparkSession
-import thesis.DataTypes.LandyAttributeGraph
+import thesis.DataTypes.ValidityAttributeGraph
 import thesis.SparkConfiguration.getSparkSession
-import thesis.LandyEntityPayload
+import thesis.ValidityEntityPayload
 import utils.TimeUtils.{t1, t2, t3, t4}
 
-import java.time.Instant
 import scala.collection.immutable.HashMap
 
-object LandyGraphFactory {
-  def createGraph(): LandyAttributeGraph = {
+object ValidityGraphFactory {
+  def createGraph(): ValidityAttributeGraph = {
     val spark: SparkSession = getSparkSession
 
     val vertices = spark.sparkContext.parallelize(getVertices)
@@ -19,11 +18,11 @@ object LandyGraphFactory {
 
     Graph(vertices, edges)
   }
-  
-  def getVertices(): Seq[(VertexId, LandyEntityPayload)] = {
+
+  def getVertices(): Seq[(VertexId, ValidityEntityPayload)] = {
     Seq(
       (1000L,
-        LandyEntityPayload(
+        ValidityEntityPayload(
           id = 1L,
           validFrom = t1,
           validTo = t2,
@@ -33,7 +32,7 @@ object LandyGraphFactory {
         )
       ),
       (1001L,
-        LandyEntityPayload(
+        ValidityEntityPayload(
           id = 1L,
           validFrom = t2,
           validTo = t3,
@@ -43,7 +42,7 @@ object LandyGraphFactory {
         )
       ),
       (1002L,
-        LandyEntityPayload(
+        ValidityEntityPayload(
           id = 2L,
           validFrom = t1,
           validTo = t4,
@@ -55,10 +54,10 @@ object LandyGraphFactory {
     )
   }
 
-  def getEdges(): Seq[Edge[LandyEntityPayload]] = {
+  def getEdges(): Seq[Edge[ValidityEntityPayload]] = {
     Seq(
       Edge(1L, 2L,
-        LandyEntityPayload(
+        ValidityEntityPayload(
           id = 1003L,
           validFrom = t1,
           validTo = t2,
@@ -68,7 +67,7 @@ object LandyGraphFactory {
         )
       ),
       Edge(1L, 2L,
-        LandyEntityPayload(
+        ValidityEntityPayload(
           id = 1003L,
           validFrom = t2,
           validTo = t3,

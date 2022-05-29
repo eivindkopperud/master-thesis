@@ -4,7 +4,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.graphx.{Edge, Graph, VertexId, VertexRDD}
 import org.apache.spark.rdd.RDD
 import thesis.Action.{CREATE, UPDATE}
-import thesis.DataTypes.{Attributes, EdgeId, LandyAttributeGraph}
+import thesis.DataTypes.{Attributes, EdgeId, ValidityAttributeGraph}
 import utils.{EntityFilterException, LogUtils, UtilsUtils}
 
 import java.time.Instant
@@ -12,10 +12,10 @@ import scala.collection.mutable
 import scala.math.Ordered.orderingToOrdered
 
 
-class Landy(attributeGraph: LandyAttributeGraph) extends TemporalGraph {
-  val underlyingGraph: LandyAttributeGraph = attributeGraph
+class Validity(attributeGraph: ValidityAttributeGraph) extends TemporalGraph {
+  val underlyingGraph: ValidityAttributeGraph = attributeGraph
 
-  def snapshotAtTimeLandy(instant: Instant): Graph[LandyEntityPayload, LandyEntityPayload] = {
+  def snapshotAtTimeLandy(instant: Instant): Graph[ValidityEntityPayload, ValidityEntityPayload] = {
     val vertices = localVertices
       .filter(vertex =>
         vertex._2.validFrom < instant &&
@@ -79,7 +79,7 @@ class Landy(attributeGraph: LandyAttributeGraph) extends TemporalGraph {
    * @param payloads Payload updates for a single entity
    * @return The data that corresponds to the earliest timestamp
    */
-  private def getEarliest(payloads: Seq[LandyEntityPayload]): LandyEntityPayload = {
+  private def getEarliest(payloads: Seq[ValidityEntityPayload]): ValidityEntityPayload = {
     payloads.minBy(_.validFrom)
   }
 
@@ -90,7 +90,7 @@ class Landy(attributeGraph: LandyAttributeGraph) extends TemporalGraph {
    *
    * @return The local vertices of the graph
    */
-  private def localVertices: VertexRDD[LandyEntityPayload] = {
+  private def localVertices: VertexRDD[ValidityEntityPayload] = {
     this.underlyingGraph.vertices.filter(vertex => vertex._2 != null)
   }
 
@@ -122,32 +122,32 @@ class Landy(attributeGraph: LandyAttributeGraph) extends TemporalGraph {
 
 }
 
-object Landy {
-  def createEdge(log: LogTSV, validTo: Instant): Edge[LandyEntityPayload] = {
+object Validity {
+  def createEdge(log: LogTSV, validTo: Instant): Edge[ValidityEntityPayload] = {
     log.entity match {
       case _: VERTEX => throw new EntityFilterException
       case EDGE(id, srcId, dstId) => {
-        val payload = LandyEntityPayload(id = id, validFrom = log.timestamp, validTo = validTo, attributes = log.attributes)
+        val payload = ValidityEntityPayload(id = id, validFrom = log.timestamp, validTo = validTo, attributes = log.attributes)
         Edge(srcId, dstId, payload)
       }
     }
   }
 
-  def createVertex(log: LogTSV, validTo: Instant): (VertexId, LandyEntityPayload) = {
+  def createVertex(log: LogTSV, validTo: Instant): (VertexId, ValidityEntityPayload) = {
     log.entity match {
       case VERTEX(id) => {
-        val payload = LandyEntityPayload(id = id, validFrom = log.timestamp, validTo = validTo, attributes = log.attributes)
+        val payload = ValidityEntityPayload(id = id, validFrom = log.timestamp, validTo = validTo, attributes = log.attributes)
         (UtilsUtils.uuid, payload)
       }
       case _: EDGE => throw new EntityFilterException
     }
   }
 
-  def generateEdges(logs: Seq[LogTSV]): Seq[Edge[LandyEntityPayload]] = {
+  def generateEdges(logs: Seq[LogTSV]): Seq[Edge[ValidityEntityPayload]] = {
     val reversedLogs = LogUtils.reverse(logs)
     val aVeryBigDate = Instant.MAX
     var lastTimestamp = aVeryBigDate
-    val edges = mutable.MutableList[Edge[LandyEntityPayload]]()
+    val edges = mutable.MutableList[Edge[ValidityEntityPayload]]()
     for (log <- reversedLogs) {
       // DELETES should not create an edge, but instead record the deletion timestamp to be used later.
       if (log.action == CREATE || log.action == UPDATE) {
@@ -158,11 +158,11 @@ object Landy {
     edges
   }
 
-  def generateVertices(logs: Seq[LogTSV]): Seq[(VertexId, LandyEntityPayload)] = {
+  def generateVertices(logs: Seq[LogTSV]): Seq[(VertexId, ValidityEntityPayload)] = {
     val reversedLogs = LogUtils.reverse(logs)
     val aVeryBigDate = Instant.MAX
     var lastTimestamp = aVeryBigDate
-    val vertices = mutable.MutableList[(VertexId, LandyEntityPayload)]()
+    val vertices = mutable.MutableList[(VertexId, ValidityEntityPayload)]()
     for (log <- reversedLogs) {
       // DELETES should not create a vertex, but instead record the deletion timestamp to be used later.
       if (log.action == CREATE || log.action == UPDATE) {
@@ -173,13 +173,13 @@ object Landy {
     vertices
   }
 
-  def apply(logs: RDD[LogTSV])(implicit sc: SparkContext): Landy = {
+  def apply(logs: RDD[LogTSV])(implicit sc: SparkContext): Validity = {
     val edges = LogUtils.groupEdgeLogsById(logs)
       .flatMap(actionsByEdge => generateEdges(actionsByEdge._2.toSeq))
     val vertices = LogUtils.groupVertexLogsById(logs)
       .flatMap(actionsByVertex => generateVertices(actionsByVertex._2.toSeq))
 
     val graph = Graph(vertices, edges)
-    new Landy(graph)
+    new Validity(graph)
   }
 }
